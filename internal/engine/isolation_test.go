@@ -19,7 +19,7 @@ func TestEngineIsolatesPerBookSearchError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/api/v1/search":
-			if strings.Contains(r.URL.RawQuery, "BADISBN") {
+			if strings.Contains(r.URL.RawQuery, "Triggerfail") {
 				w.WriteHeader(503) // simulate a slow/broken provider
 				return
 			}
@@ -40,7 +40,7 @@ func TestEngineIsolatesPerBookSearchError(t *testing.T) {
 	defer st.Close()
 	sh := shelfarr.New(srv.URL, config.SecretString("t"), nil)
 	books := []sources.Book{
-		{Source: "goodreads", ExternalID: "1", Title: "Whatever", Author: "X", ISBN10: "BADISBN"},
+		{Source: "goodreads", ExternalID: "1", Title: "Triggerfail Book", Author: "Z"},
 		{Source: "goodreads", ExternalID: "2", Title: "Dune", Author: "Frank Herbert"},
 	}
 	e := New(fixedSource{books}, st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25})

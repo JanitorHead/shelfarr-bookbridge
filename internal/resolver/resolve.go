@@ -23,7 +23,7 @@ func Resolve(b sources.Book, results []shelfarr.SearchResult, threshold float64)
 	var best *Pick
 	var bestConf int
 	for _, r := range results {
-		score := 0.7*Similarity(b.Title, r.Title) + 0.3*Similarity(b.Author, r.Author)
+		score := 0.7*TitleSimilarity(b.Title, r.Title) + 0.3*Similarity(b.Author, r.Author)
 		if score < threshold {
 			continue
 		}

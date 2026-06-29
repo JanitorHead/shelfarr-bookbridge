@@ -77,10 +77,10 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		return rep, err
 	}
 	for _, b := range pending {
-		q := b.ISBN10
-		if q == "" {
-			q = b.Title + " " + b.Author
-		}
+		// Query by title+author, not ISBN: a Goodreads ISBN often resolves to a
+		// different-language edition/work in the metadata providers (e.g. a
+		// Spanish ISBN -> the English original), which then fails title matching.
+		q := b.Title + " " + b.Author
 		results, err := e.sh.Search(ctx, q, 10)
 		if err != nil {
 			// per-item isolation: one slow/failed search must not abort the run.
@@ -164,10 +164,7 @@ func statusToState(s string) string {
 // resolveAndRequest searches+resolves+requests one book. Returns one of
 // "requested", "exists", "not_found".
 func (e *Engine) resolveAndRequest(ctx context.Context, b sources.Book) (string, error) {
-	q := b.ISBN10
-	if q == "" {
-		q = b.Title + " " + b.Author
-	}
+	q := b.Title + " " + b.Author
 	results, err := e.sh.Search(ctx, q, 10)
 	if err != nil {
 		return "", err

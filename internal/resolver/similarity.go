@@ -38,6 +38,27 @@ func trigrams(s string) map[string]struct{} {
 	return m
 }
 
+// mainTitle returns the part before a subtitle separator (":"), e.g.
+// "Thinking In Systems: A Primer" -> "Thinking In Systems".
+func mainTitle(s string) string {
+	if i := strings.IndexByte(s, ':'); i > 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// TitleSimilarity is subtitle-tolerant: it returns the better of the full-title
+// and main-title (pre-":") trigram similarity. This matches "Foo: A Primer"
+// against "Foo" (metadata sources often drop the subtitle) without letting
+// "Dune" match "Dune Messiah" (neither has a subtitle, so full == main is low).
+func TitleSimilarity(a, b string) float64 {
+	full := Similarity(a, b)
+	if m := Similarity(mainTitle(a), mainTitle(b)); m > full {
+		return m
+	}
+	return full
+}
+
 // Similarity is the Dice coefficient of character trigrams after normalization.
 func Similarity(a, b string) float64 {
 	na, nb := normalize(a), normalize(b)

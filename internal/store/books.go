@@ -55,3 +55,11 @@ func (s *Store) SetState(ctx context.Context, b sources.Book, state string) erro
 		state, b.Source, b.ExternalID)
 	return err
 }
+
+// SetRequested records a successful (or already-existing) request.
+func (s *Store) SetRequested(ctx context.Context, b sources.Book, workID, requestID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE books SET state='requested', work_id=?, shelfarr_request_id=?, updated_at=datetime('now')
+		 WHERE source=? AND external_id=?`, workID, requestID, b.Source, b.ExternalID)
+	return err
+}

@@ -88,3 +88,11 @@ func (s *Store) SetRequested(ctx context.Context, b sources.Book, workID, reques
 		 WHERE source=? AND external_id=?`, workID, requestID, b.Source, b.ExternalID)
 	return err
 }
+
+// SetChosenLanguage records the inferred language used for a book's request.
+func (s *Store) SetChosenLanguage(ctx context.Context, b sources.Book, lang string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE books SET chosen_language=?, updated_at=datetime('now') WHERE source=? AND external_id=?`,
+		lang, b.Source, b.ExternalID)
+	return err
+}

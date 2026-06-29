@@ -18,6 +18,7 @@ type Config struct {
 	SimilarityThreshold float64
 	FirstRun            string
 	MaxRequestsPerRun   int
+	LangInference       bool
 }
 
 func Load() (Config, error) { return loadFrom(os.Getenv) }
@@ -37,6 +38,7 @@ func loadFrom(get func(string) string) (Config, error) {
 		SimilarityThreshold: 0.82,
 		FirstRun:            orDefault(get("FIRST_RUN"), "baseline"),
 		MaxRequestsPerRun:   25,
+		LangInference:       get("LANG_INFERENCE") != "off",
 	}
 	if v := get("SIMILARITY_THRESHOLD"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {

@@ -43,7 +43,7 @@ func run(args []string, getenv func(string) string, out io.Writer) int {
 	}
 	defer st.Close()
 
-	src := goodreads.NewRSSSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, getenv("GOODREADS_BASE"), nil)
+	src := goodreads.NewSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
 	sh := shelfarr.New(cfg.ShelfarrURL, cfg.ShelfarrToken, nil)
 	ctx := context.Background()
 

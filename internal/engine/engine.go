@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/resolver"
@@ -44,7 +45,17 @@ func (e *Engine) detectLang(b sources.Book) string {
 	return ""
 }
 
+var ErrRunInProgress = errors.New("a sync run is already in progress")
+
 func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
+	ok, err := e.st.AcquireRun(ctx)
+	if err != nil {
+		return Report{}, err
+	}
+	if !ok {
+		return Report{}, ErrRunInProgress
+	}
+	defer e.st.ReleaseRun(ctx)
 	var rep Report
 	books, err := e.src.Fetch(ctx, e.cfg.Shelves)
 	if err != nil {

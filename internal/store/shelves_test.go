@@ -44,13 +44,13 @@ func TestBaselineUsesBookShelves(t *testing.T) {
 	}
 }
 
-func TestSchemaVersionIsTwo(t *testing.T) {
+func TestSchemaVersionIsThree(t *testing.T) {
 	s := newTestStore(t)
 	var ver int
 	if err := s.db.QueryRow("PRAGMA user_version").Scan(&ver); err != nil {
 		t.Fatal(err)
 	}
-	if ver != schemaVersion || schemaVersion != 2 {
-		t.Fatalf("user_version=%d schemaVersion=%d, want 2", ver, schemaVersion)
+	if ver != schemaVersion || schemaVersion != 3 {
+		t.Fatalf("user_version=%d schemaVersion=%d, want 3", ver, schemaVersion)
 	}
 }

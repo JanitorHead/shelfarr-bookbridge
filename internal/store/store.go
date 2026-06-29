@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
 
 	_ "modernc.org/sqlite"
 )
@@ -19,6 +20,7 @@ func Open(path string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1) // single serialized writer
 	s := &Store{db: db}
+	_ = os.Chmod(path, 0o600) // best-effort; tighten secrets at rest on Linux
 	if err := s.migrate(); err != nil {
 		db.Close()
 		return nil, err

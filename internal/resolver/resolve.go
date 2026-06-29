@@ -2,10 +2,23 @@ package resolver
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/shelfarr"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 )
+
+// SearchQuery builds a clean Shelfarr metadata query from a Goodreads book:
+// the main title (subtitle dropped), plus the author flipped from Goodreads'
+// "Last, First" to "First Last", with whitespace/newlines collapsed. A long
+// raw subtitle or a "Last, First" author noticeably worsens search recall.
+func SearchQuery(title, author string) string {
+	a := strings.TrimSpace(author)
+	if i := strings.Index(a, ", "); i > 0 {
+		a = strings.TrimSpace(a[i+2:]) + " " + strings.TrimSpace(a[:i])
+	}
+	return strings.Join(strings.Fields(MainTitle(title)+" "+a), " ")
+}
 
 type Pick struct {
 	WorkID   string
@@ -23,7 +36,15 @@ func Resolve(b sources.Book, results []shelfarr.SearchResult, threshold float64)
 	var best *Pick
 	var bestConf int
 	for _, r := range results {
-		score := 0.7*TitleSimilarity(b.Title, r.Title) + 0.3*Similarity(b.Author, r.Author)
+		titleSim := TitleSimilarity(b.Title, r.Title)
+		var score float64
+		if strings.TrimSpace(r.Author) == "" || strings.TrimSpace(b.Author) == "" {
+			// author unknown on one side -> judge on title alone (the metadata
+			// source sometimes returns a matching work with no author).
+			score = titleSim
+		} else {
+			score = 0.7*titleSim + 0.3*Similarity(b.Author, r.Author)
+		}
 		if score < threshold {
 			continue
 		}

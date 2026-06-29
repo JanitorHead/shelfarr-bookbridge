@@ -21,6 +21,16 @@ func main() {
 	}
 	defer db.Close()
 
+	if len(os.Args) > 2 && os.Args[2] == "reset" {
+		// give not_found/parked books a fresh set of recheck attempts
+		res, err := db.Exec(`UPDATE books SET state='not_found', attempt_count=0 WHERE state IN ('not_found','parked')`)
+		if err != nil {
+			panic(err)
+		}
+		n, _ := res.RowsAffected()
+		fmt.Printf("reset %d not_found/parked books to attempt_count=0\n", n)
+	}
+
 	rows, err := db.Query(`SELECT state, COUNT(*) FROM books GROUP BY state ORDER BY 2 DESC`)
 	if err != nil {
 		panic(err)

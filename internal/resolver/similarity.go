@@ -38,9 +38,9 @@ func trigrams(s string) map[string]struct{} {
 	return m
 }
 
-// mainTitle returns the part before a subtitle separator (":"), e.g.
+// MainTitle returns the part before a subtitle separator (":"), e.g.
 // "Thinking In Systems: A Primer" -> "Thinking In Systems".
-func mainTitle(s string) string {
+func MainTitle(s string) string {
 	if i := strings.IndexByte(s, ':'); i > 0 {
 		return s[:i]
 	}
@@ -53,7 +53,7 @@ func mainTitle(s string) string {
 // "Dune" match "Dune Messiah" (neither has a subtitle, so full == main is low).
 func TitleSimilarity(a, b string) float64 {
 	full := Similarity(a, b)
-	if m := Similarity(mainTitle(a), mainTitle(b)); m > full {
+	if m := Similarity(MainTitle(a), MainTitle(b)); m > full {
 		return m
 	}
 	return full

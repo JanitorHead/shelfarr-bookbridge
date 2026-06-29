@@ -1716,8 +1716,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 			continue
 		}
 		if dryRun {
-			rep.Requested++ // would-request count; nothing sent
-			continue
+			continue // dry-run: nothing sent, nothing counted as requested
 		}
 		if err := e.st.SetState(ctx, b, "requesting"); err != nil { // intent before POST
 			return rep, err

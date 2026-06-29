@@ -7,7 +7,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 type Store struct{ db *sql.DB }
 
@@ -36,41 +36,33 @@ func (s *Store) migrate() error {
 	if ver > schemaVersion {
 		return fmt.Errorf("db schema v%d is newer than supported v%d; upgrade BookBridge", ver, schemaVersion)
 	}
-	if ver == schemaVersion {
-		return nil
-	}
-	const ddl = `
-CREATE TABLE IF NOT EXISTS books (
-  source TEXT NOT NULL,
-  external_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  author TEXT NOT NULL,
-  isbn10 TEXT,
-  year INTEGER,
-  cover_url TEXT,
-  added_at TEXT,
-  first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
-  state TEXT NOT NULL,
-  work_id TEXT,
-  chosen_language TEXT,
-  chosen_format TEXT,
-  shelfarr_request_id TEXT,
-  attempt_count INTEGER NOT NULL DEFAULT 0,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (source, external_id)
-);
+	migrations := []string{
+		// v1
+		`CREATE TABLE IF NOT EXISTS books (
+  source TEXT NOT NULL, external_id TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL,
+  isbn10 TEXT, year INTEGER, cover_url TEXT, added_at TEXT,
+  first_seen_at TEXT NOT NULL DEFAULT (datetime('now')), state TEXT NOT NULL,
+  work_id TEXT, chosen_language TEXT, chosen_format TEXT, shelfarr_request_id TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (source, external_id));
 CREATE INDEX IF NOT EXISTS idx_books_state ON books(state);
 CREATE TABLE IF NOT EXISTS shelf_config (
-  shelf TEXT PRIMARY KEY,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  baselined_at TEXT,
-  format TEXT,
-  language TEXT
-);
-`
-	if _, err := s.db.Exec(ddl); err != nil {
-		return err
+  shelf TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, baselined_at TEXT, format TEXT, language TEXT);`,
+		// v2
+		`CREATE TABLE IF NOT EXISTS book_shelves (
+  source TEXT NOT NULL, external_id TEXT NOT NULL, shelf TEXT NOT NULL,
+  PRIMARY KEY (source, external_id, shelf));
+CREATE INDEX IF NOT EXISTS idx_book_shelves_shelf ON book_shelves(shelf);`,
 	}
-	_, err := s.db.Exec(fmt.Sprintf("PRAGMA user_version = %d", schemaVersion))
-	return err
+	for i := ver; i < schemaVersion; i++ {
+		if _, err := s.db.Exec(migrations[i]); err != nil {
+			return fmt.Errorf("migration to v%d: %w", i+1, err)
+		}
+	}
+	if ver < schemaVersion {
+		if _, err := s.db.Exec(fmt.Sprintf("PRAGMA user_version = %d", schemaVersion)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

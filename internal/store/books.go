@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"strings"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 )
@@ -17,17 +16,24 @@ func (s *Store) Diff(ctx context.Context, books []sources.Book) ([]sources.Book,
 	}
 	defer tx.Rollback()
 	for _, b := range books {
+		// always (re)assert shelf membership, even for known books
+		for _, sh := range b.Shelves {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT OR IGNORE INTO book_shelves(source,external_id,shelf) VALUES(?,?,?)`,
+				b.Source, b.ExternalID, sh); err != nil {
+				return nil, err
+			}
+		}
 		var exists int
-		err := tx.QueryRowContext(ctx,
-			`SELECT 1 FROM books WHERE source=? AND external_id=?`, b.Source, b.ExternalID).Scan(&exists)
-		if err == nil {
-			continue // already known
+		if err := tx.QueryRowContext(ctx,
+			`SELECT 1 FROM books WHERE source=? AND external_id=?`, b.Source, b.ExternalID).Scan(&exists); err == nil {
+			continue
 		}
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state,chosen_format)
-			 VALUES(?,?,?,?,?,?,?,?, 'new', ?)`,
+			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state)
+			 VALUES(?,?,?,?,?,?,?,?, 'new')`,
 			b.Source, b.ExternalID, b.Title, b.Author, b.ISBN10, b.Year, b.CoverURL,
-			b.AddedAt.Format("2006-01-02T15:04:05Z07:00"), strings.Join(b.Shelves, ",")); err != nil {
+			b.AddedAt.Format("2006-01-02T15:04:05Z07:00")); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -38,14 +44,33 @@ func (s *Store) Diff(ctx context.Context, books []sources.Book) ([]sources.Book,
 	return out, nil
 }
 
-// BaselineShelf marks current 'new' books whose shelves contain `shelf` as
-// 'baseline' so the first run does not mass-request an existing backlog.
+// BaselineShelf marks current 'new' books that belong to `shelf` as 'baseline'.
 func (s *Store) BaselineShelf(ctx context.Context, shelf string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE books SET state='baseline', updated_at=datetime('now')
-		 WHERE state='new' AND (','||chosen_format||',') LIKE ?`, "%,"+shelf+",%")
-	// chosen_format temporarily carries the comma-joined shelves from Diff; see note.
+		 WHERE state='new' AND EXISTS (
+		   SELECT 1 FROM book_shelves bs
+		   WHERE bs.source=books.source AND bs.external_id=books.external_id AND bs.shelf=?)`, shelf)
 	return err
+}
+
+// ShelvesOf returns the shelves a book belongs to.
+func (s *Store) ShelvesOf(ctx context.Context, source, externalID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT shelf FROM book_shelves WHERE source=? AND external_id=?`, source, externalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var sh string
+		if err := rows.Scan(&sh); err != nil {
+			return nil, err
+		}
+		out = append(out, sh)
+	}
+	return out, rows.Err()
 }
 
 // SetState transitions a book's lifecycle state.

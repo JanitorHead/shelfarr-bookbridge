@@ -96,3 +96,71 @@ func (s *Store) SetChosenLanguage(ctx context.Context, b sources.Book, lang stri
 		lang, b.Source, b.ExternalID)
 	return err
 }
+
+type ReqRef struct {
+	Source     string
+	ExternalID string
+	RequestID  string
+}
+
+// OpenRequestItems returns books that have an in-flight Shelfarr request.
+func (s *Store) OpenRequestItems(ctx context.Context) ([]ReqRef, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT source, external_id, shelfarr_request_id FROM books
+		 WHERE shelfarr_request_id IS NOT NULL AND shelfarr_request_id <> ''
+		   AND state IN ('requested','searching','downloading','processing')`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ReqRef
+	for rows.Next() {
+		var r ReqRef
+		if err := rows.Scan(&r.Source, &r.ExternalID, &r.RequestID); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ApplyStatus sets a book's state (used by reconciliation).
+func (s *Store) ApplyStatus(ctx context.Context, source, externalID, state string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE books SET state=?, updated_at=datetime('now') WHERE source=? AND external_id=?`,
+		state, source, externalID)
+	return err
+}
+
+// NotFoundItems returns books still in not_found below the attempt cap.
+func (s *Store) NotFoundItems(ctx context.Context, maxAttempts int) ([]sources.Book, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT source, external_id, title, author, COALESCE(isbn10,'') FROM books
+		 WHERE state='not_found' AND attempt_count < ?`, maxAttempts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []sources.Book
+	for rows.Next() {
+		var b sources.Book
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.ISBN10); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// IncAttempt increments and returns a book's attempt counter.
+func (s *Store) IncAttempt(ctx context.Context, source, externalID string) (int, error) {
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE books SET attempt_count = attempt_count + 1, updated_at=datetime('now')
+		 WHERE source=? AND external_id=?`, source, externalID); err != nil {
+		return 0, err
+	}
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT attempt_count FROM books WHERE source=? AND external_id=?`, source, externalID).Scan(&n)
+	return n, err
+}

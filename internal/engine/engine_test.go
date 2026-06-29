@@ -28,6 +28,10 @@ func mockShelfarr(t *testing.T) *httptest.Server {
 			w.Write([]byte(`{"requests":[{"id":"req_1"}],"errors":[]}`))
 			return
 		}
+		if r.Method == http.MethodGet { // reconcile poll: GET /api/v1/requests/:id
+			w.Write([]byte(`{"status":"completed"}`))
+			return
+		}
 		t.Errorf("unexpected path %s", r.URL.Path)
 	}))
 }

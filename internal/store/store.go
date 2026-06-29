@@ -28,6 +28,9 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// DB exposes the underlying *sql.DB for tests and advanced callers.
+func (s *Store) DB() *sql.DB { return s.db }
+
 func (s *Store) migrate() error {
 	var ver int
 	if err := s.db.QueryRow("PRAGMA user_version").Scan(&ver); err != nil {

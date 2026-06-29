@@ -30,6 +30,10 @@ func TestEngineSendsDetectedLanguage(t *testing.T) {
 			w.Write([]byte(`{"results":[{"work_id":"ol:1","title":"Dune","author":"Frank Herbert","confidence":90}]}`))
 			return
 		}
+		if r.Method == http.MethodGet { // reconcile poll: GET /api/v1/requests/:id
+			w.Write([]byte(`{"status":"completed"}`))
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		var m map[string]any
 		json.Unmarshal(body, &m)

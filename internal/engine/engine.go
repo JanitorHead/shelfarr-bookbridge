@@ -11,16 +11,34 @@ import (
 )
 
 type Engine struct {
-	src sources.Source
-	st  *store.Store
-	sh  *shelfarr.Client
-	cfg config.Config
+	src      sources.Source
+	st       *store.Store
+	sh       *shelfarr.Client
+	cfg      config.Config
+	detector LanguageDetector
 }
 
 type Report struct{ Fetched, New, Requested, NotFound, AlreadyExists int }
 
 func New(src sources.Source, st *store.Store, sh *shelfarr.Client, cfg config.Config) *Engine {
 	return &Engine{src: src, st: st, sh: sh, cfg: cfg}
+}
+
+// LanguageDetector infers an ISO 639-1 language from a title; ok=false means omit.
+type LanguageDetector interface {
+	Detect(title string) (string, bool)
+}
+
+func (e *Engine) SetDetector(d LanguageDetector) { e.detector = d }
+
+func (e *Engine) detectLang(b sources.Book) string {
+	if e.detector == nil || !e.cfg.LangInference {
+		return ""
+	}
+	if lang, ok := e.detector.Detect(b.Title); ok {
+		return lang
+	}
+	return ""
 }
 
 func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
@@ -60,12 +78,17 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		if dryRun {
 			continue // nothing sent; dry-run requests nothing
 		}
+		lang := e.detectLang(b)
+		if lang != "" {
+			_ = e.st.SetChosenLanguage(ctx, b, lang)
+		}
 		if err := e.st.SetState(ctx, b, "requesting"); err != nil { // intent before POST
 			return rep, err
 		}
 		id, exists, err := e.sh.CreateRequest(ctx, shelfarr.CreateRequestParams{
 			WorkID:    pick.WorkID,
 			BookTypes: []string{e.cfg.Format},
+			Language:  lang,
 			Title:     b.Title,
 			Author:    b.Author,
 			CoverURL:  pick.CoverURL,

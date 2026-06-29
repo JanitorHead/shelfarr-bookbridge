@@ -21,6 +21,9 @@ type Config struct {
 
 func Load() (Config, error) { return loadFrom(os.Getenv) }
 
+// Load2 loads config from a custom getenv (used by the CLI/tests).
+func Load2(get func(string) string) (Config, error) { return loadFrom(get) }
+
 func loadFrom(get func(string) string) (Config, error) {
 	c := Config{
 		ShelfarrURL:         get("SHELFARR_URL"),

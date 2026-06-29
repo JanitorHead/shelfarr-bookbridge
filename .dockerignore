@@ -1,0 +1,7 @@
+.git
+docs
+*.md
+dist
+bin
+*.db
+*.sqlite

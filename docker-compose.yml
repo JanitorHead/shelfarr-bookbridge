@@ -1,0 +1,21 @@
+services:
+  bookbridge:
+    image: bookbridge:latest
+    container_name: bookbridge
+    restart: unless-stopped
+    volumes:
+      - ./config:/config
+    environment:
+      SHELFARR_URL: "http://shelfarr:3000"
+      SHELFARR_TOKEN: "shf_xxxxxxxx"
+      GOODREADS_USER_ID: "00000000"
+      # For a private shelf >100 items, paste your browser session cookie:
+      GOODREADS_COOKIE: "_session_id2=...; ..."
+      # For a public/private <=100 shelf, use the RSS feed key instead:
+      # GOODREADS_FEED_KEY: "..."
+      SHELVES: "to-read"
+      FORMAT: "ebook"
+      LANG_INFERENCE: "on"
+      SCHEDULE: "0 * * * *"
+      MAX_REQUESTS_PER_RUN: "25"
+      FIRST_RUN: "baseline"

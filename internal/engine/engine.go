@@ -22,6 +22,7 @@ type Engine struct {
 type Report struct {
 	Fetched, New, Requested, NotFound, AlreadyExists int
 	Reconciled, Completed, Failed, Rechecked, Parked int
+	Errors int // per-item transient failures (timeouts, 5xx) — isolated, not fatal
 }
 
 func New(src sources.Source, st *store.Store, sh *shelfarr.Client, cfg config.Config) *Engine {
@@ -82,7 +83,13 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		}
 		results, err := e.sh.Search(ctx, q, 10)
 		if err != nil {
-			return rep, err
+			// per-item isolation: one slow/failed search must not abort the run.
+			rep.Errors++
+			if !dryRun {
+				_ = e.st.SetState(ctx, b, "not_found") // routes into bounded recheck
+				_, _ = e.st.IncAttempt(ctx, b.Source, b.ExternalID)
+			}
+			continue
 		}
 		pick, _ := resolver.Resolve(b, results, e.cfg.SimilarityThreshold)
 		if pick == nil {
@@ -112,7 +119,11 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 			Year:      pick.Year,
 		})
 		if err != nil {
-			return rep, err
+			// per-item isolation: a failed POST must not abort the rest of the run.
+			rep.Errors++
+			_ = e.st.SetState(ctx, b, "not_found")
+			_, _ = e.st.IncAttempt(ctx, b.Source, b.ExternalID)
+			continue
 		}
 		if exists {
 			rep.AlreadyExists++
@@ -199,7 +210,13 @@ func (e *Engine) recheckPhase(ctx context.Context, rep *Report) error {
 		}
 		outcome, err := e.resolveAndRequest(ctx, b)
 		if err != nil {
-			return err
+			// per-item isolation: count toward attempts, park if exhausted, keep going.
+			rep.Errors++
+			if n, _ := e.st.IncAttempt(ctx, b.Source, b.ExternalID); n >= maxRecheckAttempts {
+				_ = e.st.ApplyStatus(ctx, b.Source, b.ExternalID, "parked")
+				rep.Parked++
+			}
+			continue
 		}
 		if outcome == "not_found" {
 			n, err := e.st.IncAttempt(ctx, b.Source, b.ExternalID)
@@ -229,7 +246,9 @@ func (e *Engine) reconcilePhase(ctx context.Context, rep *Report) error {
 				_ = e.st.ApplyStatus(ctx, ref.Source, ref.ExternalID, "cancelled")
 				continue
 			}
-			return err
+			// per-item isolation: a transient status-poll failure retries next run.
+			rep.Errors++
+			continue
 		}
 		newState := statusToState(st.Status)
 		if err := e.st.ApplyStatus(ctx, ref.Source, ref.ExternalID, newState); err != nil {

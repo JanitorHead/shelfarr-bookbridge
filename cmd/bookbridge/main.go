@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/engine"
@@ -43,7 +45,7 @@ func buildEngine(cfg config.Config, getenv func(string) string) (*engine.Engine,
 		return nil, nil, err
 	}
 	src := goodreads.NewSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
-	sh := shelfarr.New(cfg.ShelfarrURL, cfg.ShelfarrToken, nil)
+	sh := shelfarr.New(cfg.ShelfarrURL, cfg.ShelfarrToken, &http.Client{Timeout: 20 * time.Second})
 	e := engine.New(src, st, sh, cfg)
 	if cfg.LangInference {
 		e.SetDetector(langdetect.New())
@@ -52,8 +54,8 @@ func buildEngine(cfg config.Config, getenv func(string) string) (*engine.Engine,
 }
 
 func printReport(out io.Writer, mode string, rep engine.Report) {
-	fmt.Fprintf(out, "[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d\n",
-		mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists,
+	fmt.Fprintf(out, "[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d\n",
+		mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors,
 		rep.Reconciled, rep.Completed, rep.Failed, rep.Rechecked, rep.Parked)
 }
 

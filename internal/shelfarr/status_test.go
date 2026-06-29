@@ -13,7 +13,8 @@ import (
 func TestGetRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/requests/req_1" {
-			w.Write([]byte(`{"status":"downloading","attention_needed":false,"issue_description":""}`))
+			// Shelfarr returns "id" as a JSON NUMBER — this must not break decoding.
+			w.Write([]byte(`{"id":98765,"status":"downloading","attention_needed":false,"issue_description":""}`))
 			return
 		}
 		w.WriteHeader(404)

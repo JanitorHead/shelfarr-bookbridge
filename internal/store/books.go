@@ -164,3 +164,26 @@ func (s *Store) IncAttempt(ctx context.Context, source, externalID string) (int,
 		`SELECT attempt_count FROM books WHERE source=? AND external_id=?`, source, externalID).Scan(&n)
 	return n, err
 }
+
+// PendingNewItems returns books awaiting their first request (state='new'),
+// oldest first, capped at limit. This is what drains a backlog across runs:
+// Diff only records newly-discovered books, but requesting reads from here so
+// books beyond a single run's quota are picked up on subsequent runs.
+func (s *Store) PendingNewItems(ctx context.Context, limit int) ([]sources.Book, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT source, external_id, title, author, COALESCE(isbn10,'') FROM books
+		 WHERE state='new' ORDER BY first_seen_at, rowid LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []sources.Book
+	for rows.Next() {
+		var b sources.Book
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.ISBN10); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}

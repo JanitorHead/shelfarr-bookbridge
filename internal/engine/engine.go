@@ -69,10 +69,13 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 	}
 	rep.New = len(newBooks)
 
-	for _, b := range newBooks {
-		if rep.Requested >= e.cfg.MaxRequestsPerRun {
-			break
-		}
+	// Request from the pending 'new' pool (not just freshly-diffed books) so a
+	// backlog larger than one run's quota drains across successive runs.
+	pending, err := e.st.PendingNewItems(ctx, e.cfg.MaxRequestsPerRun)
+	if err != nil {
+		return rep, err
+	}
+	for _, b := range pending {
 		q := b.ISBN10
 		if q == "" {
 			q = b.Title + " " + b.Author
@@ -169,14 +172,14 @@ func (e *Engine) resolveAndRequest(ctx context.Context, b sources.Book) (string,
 	if err := e.st.SetState(ctx, b, "requesting"); err != nil {
 		return "", err
 	}
-	_, exists, err := e.sh.CreateRequest(ctx, shelfarr.CreateRequestParams{
+	id, exists, err := e.sh.CreateRequest(ctx, shelfarr.CreateRequestParams{
 		WorkID: pick.WorkID, BookTypes: []string{e.cfg.Format}, Language: lang,
 		Title: b.Title, Author: b.Author, CoverURL: pick.CoverURL, Year: pick.Year,
 	})
 	if err != nil {
 		return "", err
 	}
-	if err := e.st.SetRequested(ctx, b, pick.WorkID, ""); err != nil {
+	if err := e.st.SetRequested(ctx, b, pick.WorkID, id); err != nil {
 		return "", err
 	}
 	if exists {

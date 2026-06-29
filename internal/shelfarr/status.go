@@ -10,8 +10,10 @@ import (
 
 var ErrRequestNotFound = errors.New("shelfarr request not found (404)")
 
+// RequestStatus is the subset of a Shelfarr request we act on. We deliberately
+// do NOT model the numeric "id" here (Shelfarr returns it as a JSON number, and
+// we already know the id we queried) — unknown JSON fields are ignored.
 type RequestStatus struct {
-	ID               string `json:"id"`
 	Status           string `json:"status"`
 	IssueDescription string `json:"issue_description"`
 	AttentionNeeded  bool   `json:"attention_needed"`

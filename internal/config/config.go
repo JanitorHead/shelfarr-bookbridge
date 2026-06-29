@@ -19,6 +19,8 @@ type Config struct {
 	FirstRun            string
 	MaxRequestsPerRun   int
 	LangInference       bool
+	ShelfarrInsecure    bool
+	Schedule            string
 }
 
 func Load() (Config, error) { return loadFrom(os.Getenv) }
@@ -39,6 +41,8 @@ func loadFrom(get func(string) string) (Config, error) {
 		FirstRun:            orDefault(get("FIRST_RUN"), "baseline"),
 		MaxRequestsPerRun:   25,
 		LangInference:       get("LANG_INFERENCE") != "off",
+		ShelfarrInsecure:    get("SHELFARR_INSECURE") == "true",
+		Schedule:            orDefault(get("SCHEDULE"), "0 * * * *"),
 	}
 	if v := get("SIMILARITY_THRESHOLD"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {

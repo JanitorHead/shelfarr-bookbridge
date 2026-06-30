@@ -49,6 +49,7 @@ var settingFields = []struct {
 	{Key: "CWA_ENABLED", Label: "Mirror Goodreads shelves into Calibre-Web-Automated (shelves + gr: tags)", Kind: "checkbox", OnValue: "true", OffValue: "false"},
 	{Key: "CWA_URL", Label: "CWA URL (e.g. http://192.168.1.10:8083)", Kind: "text"},
 	{Key: "CWA_USERNAME", Label: "CWA username", Kind: "text"},
+	{Key: "CWA_DATE_COLUMN", Label: "CWA date custom-column id (optional, e.g. 1 — pushes Goodreads date added)", Kind: "text"},
 }
 
 var secretFields = []struct{ Key, Label string }{
@@ -168,7 +169,7 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched sc
 		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),
 		"GUI_PORT": cfg.GUIPort, "AUTH_METHOD": cfg.AuthMethod, "AUTH_REQUIRED": cfg.AuthRequired,
-		"CWA_URL": cfg.CWAURL, "CWA_USERNAME": cfg.CWAUsername,
+		"CWA_URL": cfg.CWAURL, "CWA_USERNAME": cfg.CWAUsername, "CWA_DATE_COLUMN": cfg.CWADateColumn,
 	}
 	checked := map[string]bool{
 		"LANG_INFERENCE": cfg.LangInference, "SHELFARR_INSECURE": cfg.ShelfarrInsecure,

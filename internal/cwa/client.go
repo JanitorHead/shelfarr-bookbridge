@@ -219,6 +219,46 @@ func (c *Client) AddToShelf(ctx context.Context, shelfID, bookID int) error {
 	}
 }
 
+// SetRating sets a book's rating on the 0–5 star scale (CWA stores 0–10 and
+// doubles internally). 0 clears it.
+func (c *Client) SetRating(ctx context.Context, id, stars int) error {
+	if stars < 0 {
+		stars = 0
+	}
+	if stars > 5 {
+		stars = 5
+	}
+	return c.editParam(ctx, "rating", id, strconv.Itoa(stars))
+}
+
+// SetCustomColumn sets a Calibre custom column (col = the numeric column id, so
+// "1" targets custom_column_1). Dates use "YYYY-MM-DD".
+func (c *Client) SetCustomColumn(ctx context.Context, id int, col, value string) error {
+	return c.editParam(ctx, "custom_column_"+col, id, value)
+}
+
+// editParam POSTs to /ajax/editbooks/<param> (form pk/value/csrf).
+func (c *Client) editParam(ctx context.Context, param string, id int, value string) error {
+	form := url.Values{"pk": {strconv.Itoa(id)}, "value": {value}, "csrf_token": {c.csrf}}
+	req, _ := http.NewRequestWithContext(ctx, "POST", c.base+"/ajax/editbooks/"+param, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-CSRFToken", c.csrf)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("CWA edit %s HTTP %d", param, resp.StatusCode)
+	}
+	if strings.Contains(string(b), `"success": false`) {
+		return fmt.Errorf("CWA edit %s rejected: %s", param, strings.TrimSpace(string(b)))
+	}
+	return nil
+}
+
 // SplitTags parses CWA's comma-separated tag string.
 func SplitTags(s string) []string {
 	var out []string

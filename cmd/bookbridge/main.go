@@ -207,6 +207,16 @@ func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 		if err := client.SetTags(ctx, cal.ID, mergeGRTags(cal.Tags, b.Shelves)); err != nil {
 			fmt.Fprintln(out, "[cwa]", err)
 		}
+		if b.UserRating > 0 {
+			if err := client.SetRating(ctx, cal.ID, b.UserRating); err != nil {
+				fmt.Fprintln(out, "[cwa]", err)
+			}
+		}
+		if d := dateYMD(b.AddedAt); cfg.CWADateColumn != "" && d != "" {
+			if err := client.SetCustomColumn(ctx, cal.ID, cfg.CWADateColumn, d); err != nil {
+				fmt.Fprintln(out, "[cwa]", err)
+			}
+		}
 		_ = st.MarkCWATagged(ctx, b.Source, b.ExternalID)
 		done++
 	}
@@ -231,6 +241,14 @@ func bestCalibreMatch(b store.BookRow, lib []cwa.Book) *cwa.Book {
 		return pick
 	}
 	return nil
+}
+
+// dateYMD returns the YYYY-MM-DD prefix of an RFC3339 string, or "" if unset.
+func dateYMD(s string) string {
+	if len(s) < 10 || strings.HasPrefix(s, "0001") {
+		return ""
+	}
+	return s[:10]
 }
 
 // flipAuthor turns "Last, First" into "First Last" to match Calibre's author form.

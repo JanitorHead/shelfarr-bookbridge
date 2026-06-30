@@ -28,6 +28,7 @@ type Config struct {
 	CWAURL              string
 	CWAUsername         string
 	CWAPassword         SecretString
+	CWADateColumn       string // Calibre custom-column id for "date added" (e.g. "1"); "" = off
 	GUIPort             string
 	GUIBind             string
 	AuthMethod          string
@@ -62,6 +63,7 @@ func loadFrom(get func(string) string) (Config, error) {
 		CWAURL:              get("CWA_URL"),
 		CWAUsername:         get("CWA_USERNAME"),
 		CWAPassword:         SecretString(get("CWA_PASSWORD")),
+		CWADateColumn:       get("CWA_DATE_COLUMN"),
 		GUIPort:             orDefault(get("GUI_PORT"), "7373"),
 		GUIBind:             orDefault(get("GUI_BIND"), "0.0.0.0"),
 		AuthMethod:          orDefault(get("AUTH_METHOD"), "forms"),

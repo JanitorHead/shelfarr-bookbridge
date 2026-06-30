@@ -13,12 +13,22 @@ const schemaVersion = 4
 type Store struct{ db *sql.DB }
 
 func Open(path string) (*Store, error) {
-	dsn := "file:" + path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+	// No WAL: WAL needs a shared-memory mmap on the DB's directory, which FUSE
+	// filesystems (Unraid's /mnt/user shfs) don't support -> "unable to open
+	// database file (14)". The default rollback journal works everywhere, and we
+	// are single-writer (MaxOpenConns=1), so WAL buys nothing here.
+	dsn := "file:" + path + "?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // single serialized writer
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("cannot open the database at %q: %w; "+
+			"on Unraid, map /config to a real disk path (e.g. /mnt/cache/appdata/shelfarr-bookbridge), "+
+			"not the /mnt/user FUSE share", path, err)
+	}
 	s := &Store{db: db}
 	_ = os.Chmod(path, 0o600) // best-effort; tighten secrets at rest on Linux
 	if err := s.migrate(); err != nil {

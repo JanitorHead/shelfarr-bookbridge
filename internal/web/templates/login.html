@@ -1,1 +1,7 @@
-{{define "content"}}<p>{{.Title}}</p>{{end}}
+{{define "content"}}<h1>Sign in</h1>
+{{if .Error}}<div class="flash" style="background:#4a2d2d;border-color:#a33">{{.Error}}</div>{{end}}
+<form method="post" action="/login">
+<label>Username</label><input name="username" autofocus>
+<label>Password</label><input name="password" type="password">
+<button type="submit">Sign in</button></form>
+<p class="muted">First sign-in sets the admin credentials.</p>{{end}}

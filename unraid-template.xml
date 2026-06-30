@@ -11,7 +11,7 @@
   <Category>MediaApp:Books</Category>
   <Icon>https://raw.githubusercontent.com/JanitorHead/shelfarr-bookbridge/main/icon.png</Icon>
   <WebUI>http://[IP]:[PORT:7373]/</WebUI>
-  <Config Name="Config Path" Target="/config" Default="/mnt/user/appdata/shelfarr-bookbridge" Mode="rw" Description="Persistent state (SQLite) + your settings/secrets. Keep this." Type="Path" Display="always" Required="true"/>
+  <Config Name="Config Path" Target="/config" Default="/mnt/cache/appdata/shelfarr-bookbridge" Mode="rw" Description="Persistent state (SQLite) + your settings/secrets. Keep this. IMPORTANT: point this at a real disk/pool path (e.g. /mnt/cache/appdata/... or your appdata pool). Do NOT use the /mnt/user FUSE share — the SQLite database fails to open there with 'unable to open database file (14)'." Type="Path" Display="always" Required="true"/>
   <Config Name="WebUI Port" Target="7373" Default="7373" Mode="tcp" Description="Web GUI port" Type="Port" Display="always" Required="true"/>
   <Config Name="Auth Required" Target="AUTH_REQUIRED" Default="local" Mode="" Description="local = no login from your LAN, login required from outside | enabled = always | none = never" Type="Variable" Display="always" Required="false"/>
   <Config Name="Admin Password" Target="AUTH_PASSWORD" Default="" Mode="" Description="Optional. Sets the GUI admin password on first start (only needed if you access the GUI from outside your LAN). Does not expire." Type="Variable" Display="always" Required="false" Mask="true"/>

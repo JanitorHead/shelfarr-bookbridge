@@ -46,13 +46,20 @@ func TestRSSAndHTMLExternalIDsMatch(t *testing.T) {
 
 type idHaver interface{ id() string }
 
-func TestNewSourceSelectsByCookie(t *testing.T) {
-	withCookie := NewSource("42", "", "sess=abc", "", nil)
-	if _, ok := withCookie.(*HTMLSource); !ok {
-		t.Fatalf("cookie set should give *HTMLSource, got %T", withCookie)
+func TestNewSourceSelectsByMode(t *testing.T) {
+	// Explicit private_cookie -> HTML reader.
+	priv := NewSource("private_cookie", "42", "", "ck", "", nil)
+	if _, ok := priv.(*HTMLSource); !ok {
+		t.Fatalf("private_cookie should give *HTMLSource, got %T", priv)
 	}
-	noCookie := NewSource("42", "feedkey", "", "", nil)
-	if _, ok := noCookie.(*RSSSource); !ok {
-		t.Fatalf("no cookie should give *RSSSource, got %T", noCookie)
+	// Explicit public_rss ignores any cookie and uses RSS.
+	pub := NewSource("public_rss", "42", "fk", "ck", "", nil)
+	if _, ok := pub.(*RSSSource); !ok {
+		t.Fatalf("public_rss should give *RSSSource (ignoring cookie), got %T", pub)
+	}
+	// Legacy ("") falls back to the cookie-presence heuristic.
+	legacy := NewSource("", "42", "", "ck", "", nil)
+	if _, ok := legacy.(*HTMLSource); !ok {
+		t.Fatalf("legacy with cookie should give *HTMLSource, got %T", legacy)
 	}
 }

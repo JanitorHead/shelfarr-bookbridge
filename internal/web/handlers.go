@@ -33,9 +33,9 @@ var settingFields = []struct {
 	Options          []string
 	OnValue, OffValue string
 }{
+	{Key: "GOODREADS_MODE", Label: "Goodreads source mode", Kind: "select", Options: []string{"public_rss", "private_cookie"}},
 	{Key: "SHELFARR_URL", Label: "Shelfarr URL", Kind: "text"},
 	{Key: "GOODREADS_USER_ID", Label: "Goodreads user id", Kind: "text"},
-	{Key: "GOODREADS_VISIBILITY", Label: "Goodreads visibility (public/private)", Kind: "text"},
 	{Key: "SHELVES", Label: "Shelves (comma-separated)", Kind: "text"},
 	{Key: "FORMAT", Label: "Format (ebook/audiobook)", Kind: "select", Options: []string{"ebook", "audiobook"}},
 	{Key: "MAX_REQUESTS_PER_RUN", Label: "Max requests per run", Kind: "number"},
@@ -148,8 +148,8 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched sc
 	}
 	var fields []field
 	cur := map[string]string{
-		"SHELFARR_URL": cfg.ShelfarrURL, "GOODREADS_USER_ID": cfg.GoodreadsUserID,
-		"GOODREADS_VISIBILITY": s.settingValue("GOODREADS_VISIBILITY"), "SHELVES": strings.Join(cfg.Shelves, ","),
+		"GOODREADS_MODE": cfg.GoodreadsMode, "SHELFARR_URL": cfg.ShelfarrURL,
+		"GOODREADS_USER_ID": cfg.GoodreadsUserID, "SHELVES": strings.Join(cfg.Shelves, ","),
 		"FORMAT": cfg.Format, "MAX_REQUESTS_PER_RUN": itoa(cfg.MaxRequestsPerRun),
 		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),

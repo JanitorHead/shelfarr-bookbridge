@@ -73,7 +73,7 @@ func engineFor(cfg config.Config, st *store.Store, getenv func(string) string) (
 	if err := config.CheckTransport(cfg.ShelfarrURL, cfg.ShelfarrInsecure); err != nil {
 		return nil, err
 	}
-	src := goodreads.NewSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
+	src := goodreads.NewSource(cfg.GoodreadsMode, cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
 	sh := shelfarr.New(cfg.ShelfarrURL, cfg.ShelfarrToken, &http.Client{Timeout: 20 * time.Second})
 	e := engine.New(src, st, sh, cfg)
 	if cfg.LangInference {
@@ -152,7 +152,7 @@ func runSync(args []string, getenv func(string) string, out io.Writer) int {
 
 	if *baseline {
 		// baseline only reads Goodreads + marks the store; it does not touch Shelfarr.
-		src := goodreads.NewSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
+		src := goodreads.NewSource(cfg.GoodreadsMode, cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
 		books, err := src.Fetch(ctx, cfg.Shelves)
 		if err != nil {
 			fmt.Fprintln(out, "fetch error:", err)

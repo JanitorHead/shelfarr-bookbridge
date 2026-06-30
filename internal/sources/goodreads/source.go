@@ -64,11 +64,20 @@ func (s *RSSSource) Fetch(ctx context.Context, shelves []string) ([]sources.Book
 	return all, nil
 }
 
-// NewSource selects the read strategy: cookie set -> authenticated HTML (any
-// size); otherwise RSS (public or private-via-feedKey, capped at 100).
-func NewSource(userID string, feedKey, cookie config.SecretString, base string, hc *http.Client) sources.Source {
-	if cookie.Reveal() != "" {
+// NewSource selects the read strategy. An explicit mode wins:
+// "private_cookie" -> authenticated HTML (any size), "public_rss" -> RSS
+// (capped at 100, ignores the cookie). An empty mode keeps the legacy
+// heuristic: cookie set -> HTML, otherwise RSS.
+func NewSource(mode, userID string, feedKey, cookie config.SecretString, base string, hc *http.Client) sources.Source {
+	switch mode {
+	case "private_cookie":
 		return NewHTMLSource(userID, cookie, base, hc)
+	case "public_rss":
+		return NewRSSSource(userID, feedKey, base, hc)
+	default:
+		if cookie.Reveal() != "" {
+			return NewHTMLSource(userID, cookie, base, hc)
+		}
+		return NewRSSSource(userID, feedKey, base, hc)
 	}
-	return NewRSSSource(userID, feedKey, base, hc)
 }

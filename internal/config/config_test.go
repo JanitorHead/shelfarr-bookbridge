@@ -24,6 +24,17 @@ func TestLoadDefaultsAndParsing(t *testing.T) {
 	}
 }
 
+func TestGoodreadsModeLoaded(t *testing.T) {
+	env := map[string]string{"GOODREADS_MODE": "private_cookie"}
+	c, err := loadFrom(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.GoodreadsMode != "private_cookie" {
+		t.Fatalf("GoodreadsMode = %q, want private_cookie", c.GoodreadsMode)
+	}
+}
+
 func TestMissingShelfarrIsNotALoadError(t *testing.T) {
 	// The daemon/GUI must start without Shelfarr config so it can be set up in
 	// the GUI; missing URL/token is reported by ShelfarrConfigured(), not Load.

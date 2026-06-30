@@ -12,6 +12,7 @@ type Config struct {
 	GoodreadsUserID     string
 	GoodreadsFeedKey    SecretString
 	GoodreadsCookie     SecretString
+	GoodreadsMode       string
 	Shelves             []string
 	Format              string
 	SimilarityThreshold float64
@@ -38,6 +39,7 @@ func loadFrom(get func(string) string) (Config, error) {
 		GoodreadsUserID:     get("GOODREADS_USER_ID"),
 		GoodreadsFeedKey:    SecretString(get("GOODREADS_FEED_KEY")),
 		GoodreadsCookie:     SecretString(get("GOODREADS_COOKIE")),
+		GoodreadsMode:       get("GOODREADS_MODE"),
 		Shelves:             splitCSV(get("SHELVES")),
 		Format:              orDefault(get("FORMAT"), "ebook"),
 		SimilarityThreshold: 0.82,

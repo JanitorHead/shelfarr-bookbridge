@@ -48,20 +48,29 @@ func (s *Store) Diff(ctx context.Context, books []sources.Book) ([]sources.Book,
 			  user_rating    = CASE WHEN ?<>0  THEN ? ELSE user_rating END,
 			  average_rating = CASE WHEN ?<>0  THEN ? ELSE average_rating END,
 			  added_at       = CASE WHEN ?<>'' THEN ? ELSE added_at END,
-			  read_at        = CASE WHEN ?<>'' THEN ? ELSE read_at END
+			  read_at        = CASE WHEN ?<>'' THEN ? ELSE read_at END,
+			  started_at     = CASE WHEN ?<>'' THEN ? ELSE started_at END,
+			  progress_pct   = CASE WHEN ?<>0  THEN ? ELSE progress_pct END,
+			  progress_label = CASE WHEN ?<>'' THEN ? ELSE progress_label END
 			  WHERE source=? AND external_id=?`,
 				b.CoverURL, b.CoverURL, b.Description, b.Description, b.Year, b.Year,
 				b.UserRating, b.UserRating, b.AverageRating, b.AverageRating,
-				addedAt, addedAt, readAt, readAt, b.Source, b.ExternalID); err != nil {
+				addedAt, addedAt, readAt, readAt,
+				fmtTime(b.StartedAt), fmtTime(b.StartedAt), b.ProgressPct, b.ProgressPct, b.ProgressLabel, b.ProgressLabel,
+				b.Source, b.ExternalID); err != nil {
 				return nil, err
 			}
 			continue
 		}
+		// New books enter the CATALOG, not the download queue: only books in a
+		// download-trigger shelf get promoted to 'new' (see PromoteDownloadable),
+		// so ingesting the whole library never floods Shelfarr with read books.
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state,description,user_rating,average_rating,read_at)
-			 VALUES(?,?,?,?,?,?,?,?, 'new', ?,?,?,?)`,
+			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state,description,user_rating,average_rating,read_at,started_at,progress_pct,progress_label)
+			 VALUES(?,?,?,?,?,?,?,?, 'catalog', ?,?,?,?,?,?,?)`,
 			b.Source, b.ExternalID, b.Title, b.Author, b.ISBN10, b.Year, b.CoverURL, addedAt,
-			b.Description, b.UserRating, b.AverageRating, readAt); err != nil {
+			b.Description, b.UserRating, b.AverageRating, readAt,
+			fmtTime(b.StartedAt), b.ProgressPct, b.ProgressLabel); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -72,11 +81,12 @@ func (s *Store) Diff(ctx context.Context, books []sources.Book) ([]sources.Book,
 	return out, nil
 }
 
-// BaselineShelf marks current 'new' books that belong to `shelf` as 'baseline'.
+// BaselineShelf marks current un-actioned books (catalog/new) that belong to
+// `shelf` as 'baseline' — i.e. "seen, don't request".
 func (s *Store) BaselineShelf(ctx context.Context, shelf string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE books SET state='baseline', updated_at=datetime('now')
-		 WHERE state='new' AND EXISTS (
+		 WHERE state IN ('new','catalog') AND EXISTS (
 		   SELECT 1 FROM book_shelves bs
 		   WHERE bs.source=books.source AND bs.external_id=books.external_id AND bs.shelf=?)`, shelf)
 	return err
@@ -195,6 +205,7 @@ func (s *Store) IncAttempt(ctx context.Context, source, externalID string) (int,
 
 type BookRow struct {
 	Source, ExternalID, Title, Author, State, WorkID, RequestID, Language, CoverURL string
+	ReadingStatus                                                                   string
 	AttemptCount                                                                    int
 	UserRating                                                                      int
 	AverageRating                                                                   float64
@@ -210,7 +221,7 @@ func (s *Store) ListBooks(ctx context.Context, state, q string, limit int) ([]Bo
 	}
 	query := `SELECT b.source,b.external_id,b.title,b.author,b.state,COALESCE(b.work_id,''),
 	  COALESCE(b.shelfarr_request_id,''),COALESCE(b.chosen_language,''),b.attempt_count,COALESCE(b.cover_url,''),
-	  COALESCE(b.user_rating,0),COALESCE(b.average_rating,0),COALESCE(b.added_at,''),
+	  COALESCE(b.user_rating,0),COALESCE(b.average_rating,0),COALESCE(b.added_at,''),COALESCE(b.reading_status,''),
 	  COALESCE((SELECT GROUP_CONCAT(shelf, ',') FROM book_shelves bs WHERE bs.source=b.source AND bs.external_id=b.external_id),'')
 	  FROM books b`
 	var where []string
@@ -238,7 +249,7 @@ func (s *Store) ListBooks(ctx context.Context, state, q string, limit int) ([]Bo
 	for rows.Next() {
 		var b BookRow
 		var shelvesCSV string
-		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &b.UserRating, &b.AverageRating, &b.AddedAt, &shelvesCSV); err != nil {
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &b.UserRating, &b.AverageRating, &b.AddedAt, &b.ReadingStatus, &shelvesCSV); err != nil {
 			return nil, err
 		}
 		if shelvesCSV != "" {

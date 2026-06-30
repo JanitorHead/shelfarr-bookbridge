@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 10
+const schemaVersion = 11
 
 type Store struct{ db *sql.DB }
 
@@ -107,6 +107,13 @@ ALTER TABLE books ADD COLUMN read_at TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE books ADD COLUMN cwa_tagged INTEGER NOT NULL DEFAULT 0;`,
 		// v10: cooperative cancellation flag for a running sync
 		`ALTER TABLE run_state ADD COLUMN stop_requested INTEGER NOT NULL DEFAULT 0;`,
+		// v11: library-frontend model — reading status/progress/dates separate from
+		// the download lifecycle (books.state). A book in the catalog that is not a
+		// download target sits in state='catalog' and is never requested.
+		`ALTER TABLE books ADD COLUMN reading_status TEXT NOT NULL DEFAULT '';
+ALTER TABLE books ADD COLUMN started_at TEXT NOT NULL DEFAULT '';
+ALTER TABLE books ADD COLUMN progress_pct INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE books ADD COLUMN progress_label TEXT NOT NULL DEFAULT '';`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

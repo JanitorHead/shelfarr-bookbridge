@@ -30,7 +30,7 @@ func TestEngineReconcileMarksCompleted(t *testing.T) {
 	defer st.Close()
 	sh := shelfarr.New(srv.URL, config.SecretString("t"), nil)
 	src := fixedSource{[]sources.Book{{Source: "goodreads", ExternalID: "1", Title: "Dune", Author: "Frank Herbert"}}}
-	e := New(src, st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25})
+	e := New(src, st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25, Shelves: []string{"to-read"}})
 	rep, err := e.Run(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)

@@ -15,7 +15,22 @@ import (
 
 type stubSource struct{ books []sources.Book }
 
-func (s stubSource) Fetch(context.Context, []string) ([]sources.Book, error) { return s.books, nil }
+func (s stubSource) Fetch(context.Context, []string) ([]sources.Book, error) {
+	return withDefaultShelf(s.books), nil
+}
+
+// withDefaultShelf tags test books into the "to-read" download shelf when they
+// have none, so they're promoted out of the catalog into the download queue.
+func withDefaultShelf(books []sources.Book) []sources.Book {
+	out := make([]sources.Book, len(books))
+	for i, b := range books {
+		if len(b.Shelves) == 0 {
+			b.Shelves = []string{"to-read"}
+		}
+		out[i] = b
+	}
+	return out
+}
 
 func mockShelfarr(t *testing.T) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +58,7 @@ func newEngine(t *testing.T, src sources.Source, base string) *Engine {
 	}
 	t.Cleanup(func() { st.Close() })
 	sh := shelfarr.New(base, config.SecretString("shf_t"), nil)
-	cfg := config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25}
+	cfg := config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25, Shelves: []string{"to-read"}}
 	return New(src, st, sh, cfg)
 }
 

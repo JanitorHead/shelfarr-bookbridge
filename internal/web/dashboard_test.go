@@ -18,7 +18,7 @@ func TestDashboardShowsCounts(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
 	body := rec.Body.String()
-	if !strings.Contains(body, "Dashboard") || !strings.Contains(body, "new") {
+	if !strings.Contains(body, "Dashboard") || !strings.Contains(body, "catalog") {
 		t.Fatalf("dashboard missing counts: %s", body)
 	}
 }

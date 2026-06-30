@@ -38,7 +38,8 @@ func TestStateCounts(t *testing.T) {
 	})
 	s.SetState(ctx, sources.Book{Source: "goodreads", ExternalID: "1"}, "requested")
 	c, _ := s.StateCounts(ctx)
-	if c["new"] != 1 || c["requested"] != 1 {
+	// new books land in the catalog now; only the explicitly-set one is requested.
+	if c["catalog"] != 1 || c["requested"] != 1 {
 		t.Fatalf("counts: %v", c)
 	}
 }

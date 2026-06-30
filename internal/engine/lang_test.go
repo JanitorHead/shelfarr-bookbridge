@@ -45,7 +45,7 @@ func TestEngineSendsDetectedLanguage(t *testing.T) {
 	st, _ := store.Open(t.TempDir() + "/bb.db")
 	defer st.Close()
 	sh := shelfarr.New(srv.URL, config.SecretString("t"), nil)
-	e := New(stubSrc(), st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25, LangInference: true})
+	e := New(stubSrc(), st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25, LangInference: true, Shelves: []string{"to-read"}})
 	e.SetDetector(stubDetector{lang: "es"})
 	if _, err := e.Run(context.Background(), false); err != nil {
 		t.Fatal(err)
@@ -61,4 +61,6 @@ func stubSrc() sources.Source {
 
 type fixedSource struct{ b []sources.Book }
 
-func (f fixedSource) Fetch(context.Context, []string) ([]sources.Book, error) { return f.b, nil }
+func (f fixedSource) Fetch(context.Context, []string) ([]sources.Book, error) {
+	return withDefaultShelf(f.b), nil
+}

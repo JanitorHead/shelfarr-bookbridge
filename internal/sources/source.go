@@ -22,6 +22,9 @@ type Book struct {
 	UserRating    int     // the user's own rating, 0–5 (0 = unrated)
 	AverageRating float64 // community average
 	ReadAt        time.Time
+	StartedAt     time.Time
+	ProgressPct   int    // 0–100 reading progress, when known (Hardcover / GR HTML)
+	ProgressLabel string // e.g. "page 45 of 300"
 }
 
 // Source fetches books from the enabled shelves.

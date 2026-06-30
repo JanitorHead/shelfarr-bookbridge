@@ -42,7 +42,7 @@ func TestEngineDrainsBacklogAcrossRuns(t *testing.T) {
 		{Source: "goodreads", ExternalID: "2", Title: "Dune", Author: "Frank Herbert"},
 		{Source: "goodreads", ExternalID: "3", Title: "Dune", Author: "Frank Herbert"},
 	}
-	e := New(fixedSource{books}, st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 2})
+	e := New(fixedSource{books}, st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 2, Shelves: []string{"to-read"}})
 
 	rep1, err := e.Run(context.Background(), false)
 	if err != nil {

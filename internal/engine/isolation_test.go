@@ -43,7 +43,7 @@ func TestEngineIsolatesPerBookSearchError(t *testing.T) {
 		{Source: "goodreads", ExternalID: "1", Title: "Triggerfail Book", Author: "Z"},
 		{Source: "goodreads", ExternalID: "2", Title: "Dune", Author: "Frank Herbert"},
 	}
-	e := New(fixedSource{books}, st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25})
+	e := New(fixedSource{books}, st, sh, config.Config{Format: "ebook", SimilarityThreshold: 0.82, MaxRequestsPerRun: 25, Shelves: []string{"to-read"}})
 
 	rep, err := e.Run(context.Background(), false)
 	if err != nil {

@@ -88,12 +88,21 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 	defer e.st.ReleaseRun(ctx)
 	e.log("sync started (dryRun=%v)", dryRun)
 	var rep Report
-	shelves, err := e.st.ShelvesToSync(ctx, e.cfg.Shelves)
+	downloadShelves, err := e.st.ShelvesToSync(ctx, e.cfg.Shelves)
 	if err != nil {
 		return rep, err
 	}
-	e.log("reading source for shelves %v", shelves)
-	books, err := e.src.Fetch(ctx, shelves)
+	// Catalog = ALL known shelves (the whole library), not just the download
+	// targets. Before discovery has run we only know the download shelves.
+	catalogShelves, err := e.st.AllShelfSlugs(ctx)
+	if err != nil {
+		return rep, err
+	}
+	if len(catalogShelves) == 0 {
+		catalogShelves = downloadShelves
+	}
+	e.log("catalog shelves: %v · download shelves: %v", catalogShelves, downloadShelves)
+	books, err := e.src.Fetch(ctx, catalogShelves)
 	if err != nil {
 		e.log("fetch error: %v", err)
 		return rep, err
@@ -106,7 +115,11 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		return rep, err
 	}
 	rep.New = len(newBooks)
-	e.log("%d new book(s) recorded", len(newBooks))
+	_ = e.st.RefreshReadingStatus(ctx)
+	if err := e.st.PromoteDownloadable(ctx, downloadShelves); err != nil {
+		return rep, err
+	}
+	e.log("%d new book(s) added to catalog; download shelves promoted to the queue", len(newBooks))
 
 	// Request from the pending 'new' pool (not just freshly-diffed books) so a
 	// backlog larger than one run's quota drains across successive runs.

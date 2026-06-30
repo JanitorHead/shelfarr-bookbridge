@@ -5,7 +5,14 @@ services:
     restart: unless-stopped
     volumes:
       - ./config:/config
+    ports:
+      - "7373:7373"
     environment:
+      AUTH_METHOD: "forms"
+      AUTH_REQUIRED: "local"
+      AUTH_USERNAME: "admin"
+      AUTH_PASSWORD: "change-me-on-first-start"
+      GUI_PORT: "7373"
       SHELFARR_URL: "http://shelfarr:3000"
       SHELFARR_TOKEN: "shf_xxxxxxxx"
       GOODREADS_USER_ID: "00000000"

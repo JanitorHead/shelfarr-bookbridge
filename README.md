@@ -27,6 +27,15 @@ feed key) or an authenticated HTML reader (private and/or >100 items, via a sess
   first so an existing backlog isn't requested all at once.
 - `bookbridge daemon` — run on a schedule (default hourly); `--once` runs a single cycle.
 
+## Web GUI
+
+Browse to `http://<host>:7373`. Auth mirrors *arr: set `AUTH_REQUIRED=local` to skip
+login from your LAN (private/loopback addresses) and require it from outside, or
+`enabled` to always require it; `AUTH_METHOD=none` disables it entirely. The admin
+user/password are seeded from `AUTH_USERNAME`/`AUTH_PASSWORD` on first start, then
+managed in Settings. All parameters are editable in the GUI and persist in `/config`
+(overriding env). The container runs the daemon and the GUI together.
+
 ## Notes
 
 - The Goodreads session cookie expires periodically — re-grab it when you see a

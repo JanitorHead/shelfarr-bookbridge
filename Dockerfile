@@ -11,5 +11,6 @@ COPY --from=build /out/bookbridge /usr/local/bin/bookbridge
 ENV BB_DB=/config/bookbridge.db
 VOLUME ["/config"]
 USER nonroot:nonroot
+EXPOSE 7373
 ENTRYPOINT ["/usr/local/bin/bookbridge"]
 CMD ["daemon"]

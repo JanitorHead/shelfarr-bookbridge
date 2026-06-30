@@ -165,6 +165,49 @@ func (s *Store) IncAttempt(ctx context.Context, source, externalID string) (int,
 	return n, err
 }
 
+type BookRow struct {
+	Source, ExternalID, Title, Author, State, WorkID, RequestID, Language string
+	AttemptCount                                                          int
+}
+
+func (s *Store) ListBooks(ctx context.Context, state string, limit int) ([]BookRow, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+	q := `SELECT source,external_id,title,author,state,COALESCE(work_id,''),COALESCE(shelfarr_request_id,''),COALESCE(chosen_language,''),attempt_count FROM books`
+	args := []any{}
+	if state != "" {
+		q += ` WHERE state=?`
+		args = append(args, state)
+	}
+	q += ` ORDER BY updated_at DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BookRow
+	for rows.Next() {
+		var b BookRow
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) IgnoreBook(ctx context.Context, source, externalID string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE books SET state='ignored', updated_at=datetime('now') WHERE source=? AND external_id=?`, source, externalID)
+	return err
+}
+
+func (s *Store) RetryBook(ctx context.Context, source, externalID string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE books SET state='new', attempt_count=0, shelfarr_request_id='', updated_at=datetime('now') WHERE source=? AND external_id=?`, source, externalID)
+	return err
+}
+
 // PendingNewItems returns books awaiting their first request (state='new'),
 // oldest first, capped at limit. This is what drains a backlog across runs:
 // Diff only records newly-discovered books, but requesting reads from here so

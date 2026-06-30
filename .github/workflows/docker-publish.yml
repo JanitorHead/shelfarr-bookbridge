@@ -25,10 +25,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: janitorhead
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/janitorhead/shelfarr-bookbridge
+          images: |
+            ghcr.io/janitorhead/shelfarr-bookbridge
+            docker.io/janitorhead/shelfarr-bookbridge
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag

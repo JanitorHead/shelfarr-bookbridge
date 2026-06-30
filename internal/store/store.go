@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 8
+const schemaVersion = 9
 
 type Store struct{ db *sql.DB }
 
@@ -98,6 +98,8 @@ ALTER TABLE shelf_config ADD COLUMN book_count INTEGER NOT NULL DEFAULT 0;`,
 ALTER TABLE books ADD COLUMN user_rating INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE books ADD COLUMN average_rating REAL NOT NULL DEFAULT 0;
 ALTER TABLE books ADD COLUMN read_at TEXT NOT NULL DEFAULT '';`,
+		// v9: track which books have had their shelves pushed to CWA as tags
+		`ALTER TABLE books ADD COLUMN cwa_tagged INTEGER NOT NULL DEFAULT 0;`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

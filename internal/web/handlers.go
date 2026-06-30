@@ -46,6 +46,9 @@ var settingFields = []struct {
 	{Key: "GUI_PORT", Label: "GUI port", Kind: "number"},
 	{Key: "AUTH_METHOD", Label: "Auth method (forms/none)", Kind: "select", Options: []string{"forms", "none"}},
 	{Key: "AUTH_REQUIRED", Label: "Auth required (enabled/local)", Kind: "select", Options: []string{"enabled", "local"}},
+	{Key: "CWA_ENABLED", Label: "Push shelves to Calibre-Web-Automated as tags", Kind: "checkbox", OnValue: "true", OffValue: "false"},
+	{Key: "CWA_URL", Label: "CWA URL (e.g. http://192.168.1.10:8083)", Kind: "text"},
+	{Key: "CWA_USERNAME", Label: "CWA username", Kind: "text"},
 }
 
 var secretFields = []struct{ Key, Label string }{
@@ -53,6 +56,7 @@ var secretFields = []struct{ Key, Label string }{
 	{"GOODREADS_COOKIE", "Goodreads session cookie"},
 	{"GOODREADS_FEED_KEY", "Goodreads RSS feed key"},
 	{"HARDCOVER_TOKEN", "Hardcover API token"},
+	{"CWA_PASSWORD", "CWA password"},
 }
 
 // scheduleOption is one entry in the visual schedule preset selector.
@@ -164,9 +168,11 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched sc
 		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),
 		"GUI_PORT": cfg.GUIPort, "AUTH_METHOD": cfg.AuthMethod, "AUTH_REQUIRED": cfg.AuthRequired,
+		"CWA_URL": cfg.CWAURL, "CWA_USERNAME": cfg.CWAUsername,
 	}
 	checked := map[string]bool{
 		"LANG_INFERENCE": cfg.LangInference, "SHELFARR_INSECURE": cfg.ShelfarrInsecure,
+		"CWA_ENABLED": cfg.CWAEnabled,
 	}
 	for _, f := range settingFields {
 		fields = append(fields, field{

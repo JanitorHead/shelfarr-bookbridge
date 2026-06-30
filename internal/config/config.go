@@ -24,6 +24,10 @@ type Config struct {
 	LangInference       bool
 	ShelfarrInsecure    bool
 	Schedule            string
+	CWAEnabled          bool
+	CWAURL              string
+	CWAUsername         string
+	CWAPassword         SecretString
 	GUIPort             string
 	GUIBind             string
 	AuthMethod          string
@@ -54,6 +58,10 @@ func loadFrom(get func(string) string) (Config, error) {
 		LangInference:       get("LANG_INFERENCE") != "off",
 		ShelfarrInsecure:    get("SHELFARR_INSECURE") == "true",
 		Schedule:            orDefault(get("SCHEDULE"), "0 * * * *"),
+		CWAEnabled:          get("CWA_ENABLED") == "true",
+		CWAURL:              get("CWA_URL"),
+		CWAUsername:         get("CWA_USERNAME"),
+		CWAPassword:         SecretString(get("CWA_PASSWORD")),
 		GUIPort:             orDefault(get("GUI_PORT"), "7373"),
 		GUIBind:             orDefault(get("GUI_BIND"), "0.0.0.0"),
 		AuthMethod:          orDefault(get("AUTH_METHOD"), "forms"),
@@ -78,6 +86,11 @@ func loadFrom(get func(string) string) (Config, error) {
 // ShelfarrConfigured reports whether the Shelfarr URL + token are set.
 func (c Config) ShelfarrConfigured() bool {
 	return c.ShelfarrURL != "" && c.ShelfarrToken.Reveal() != ""
+}
+
+// CWAConfigured reports whether CWA push is enabled and has URL + credentials.
+func (c Config) CWAConfigured() bool {
+	return c.CWAEnabled && c.CWAURL != "" && c.CWAUsername != "" && c.CWAPassword.Reveal() != ""
 }
 
 func splitCSV(s string) []string {

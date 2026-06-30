@@ -8,12 +8,15 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/auth"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/cwa"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/engine"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/langdetect"
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/resolver"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/scheduler"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/shelfarr"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
@@ -143,7 +146,93 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 		rec.ErrorText = runErr.Error()
 	}
 	_, _ = st.RecordRun(context.Background(), rec)
+	// After a successful real run, push Goodreads shelves into CWA as tags.
+	if runErr == nil && !dryRun && cfg.CWAConfigured() {
+		cwaTagPass(st, cfg, os.Stdout)
+	}
 	return rep, runErr
+}
+
+// cwaTagPass tags downloaded ('done') books in the Calibre library (via CWA) with
+// their Goodreads shelves as "gr:<shelf>" tags, merged with the book's existing
+// tags. Each book is tagged at most once (cwa_tagged flag).
+func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
+	ctx := context.Background()
+	pending, err := st.DoneUntaggedForCWA(ctx)
+	if err != nil || len(pending) == 0 {
+		return
+	}
+	client := cwa.New(cfg.CWAURL, cfg.CWAUsername, cfg.CWAPassword)
+	if err := client.Login(ctx); err != nil {
+		fmt.Fprintln(out, "[cwa]", err)
+		return
+	}
+	lib, err := client.ListBooks(ctx)
+	if err != nil {
+		fmt.Fprintln(out, "[cwa]", err)
+		return
+	}
+	tagged := 0
+	for _, b := range pending {
+		cal := bestCalibreMatch(b, lib)
+		if cal == nil {
+			continue // not in the Calibre library yet
+		}
+		if err := client.SetTags(ctx, cal.ID, mergeGRTags(cal.Tags, b.Shelves)); err != nil {
+			fmt.Fprintln(out, "[cwa]", err)
+			continue
+		}
+		_ = st.MarkCWATagged(ctx, b.Source, b.ExternalID)
+		tagged++
+	}
+	if tagged > 0 {
+		fmt.Fprintf(out, "[cwa] tagged %d book(s) in Calibre with their Goodreads shelves\n", tagged)
+	}
+}
+
+// bestCalibreMatch finds the Calibre book matching a tracked book by title+author.
+func bestCalibreMatch(b store.BookRow, lib []cwa.Book) *cwa.Book {
+	var pick *cwa.Book
+	bestScore := -1.0
+	for i := range lib {
+		c := &lib[i]
+		score := 0.7*resolver.TitleSimilarity(b.Title, c.Title) + 0.3*resolver.Similarity(flipAuthor(b.Author), c.Authors)
+		if score > bestScore {
+			bestScore = score
+			pick = c
+		}
+	}
+	if bestScore >= 0.6 {
+		return pick
+	}
+	return nil
+}
+
+// flipAuthor turns "Last, First" into "First Last" to match Calibre's author form.
+func flipAuthor(a string) string {
+	if i := strings.Index(a, ","); i >= 0 {
+		return strings.TrimSpace(a[i+1:]) + " " + strings.TrimSpace(a[:i])
+	}
+	return a
+}
+
+// mergeGRTags unions a book's existing CWA tags with "gr:<shelf>" tags.
+func mergeGRTags(existing, shelves []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(t string) {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	for _, t := range existing {
+		add(t)
+	}
+	for _, sh := range shelves {
+		add("gr:" + sh)
+	}
+	return out
 }
 
 func reportLine(mode string, rep engine.Report) string {

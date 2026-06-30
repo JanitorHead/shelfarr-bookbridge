@@ -121,7 +121,13 @@ func (s *Server) session(r *http.Request) *session {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
+	// Embedded static files carry no modtime, so the browser can't revalidate and
+	// may serve stale CSS/JS after a container update. Force revalidation.
+	staticH := http.FileServer(http.FS(staticFS))
+	mux.Handle("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+		staticH.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
 	mux.HandleFunc("/settings", s.guard(s.handleSettings))
@@ -194,6 +200,10 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page, title stri
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// Never let the browser serve a stale GUI after a container update: these
+	// pages are dynamic, so always revalidate. (Static assets under /static keep
+	// their own default caching.)
+	w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 	if err := t.ExecuteTemplate(w, "base", base); err != nil {
 		http.Error(w, err.Error(), 500)
 	}

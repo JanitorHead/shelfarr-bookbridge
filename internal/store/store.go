@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 11
+const schemaVersion = 12
 
 type Store struct{ db *sql.DB }
 
@@ -114,6 +114,11 @@ ALTER TABLE books ADD COLUMN read_at TEXT NOT NULL DEFAULT '';`,
 ALTER TABLE books ADD COLUMN started_at TEXT NOT NULL DEFAULT '';
 ALTER TABLE books ADD COLUMN progress_pct INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE books ADD COLUMN progress_label TEXT NOT NULL DEFAULT '';`,
+		// v12: ownership cross-reference with the Calibre (CWA) library, so the
+		// Library can grey out books you don't own. owned_in_cwa is refreshed by
+		// matching the catalog against CWA's listbooks; calibre_id is the match.
+		`ALTER TABLE books ADD COLUMN owned_in_cwa INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE books ADD COLUMN calibre_id INTEGER NOT NULL DEFAULT 0;`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

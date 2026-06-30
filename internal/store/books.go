@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
@@ -210,7 +211,34 @@ type BookRow struct {
 	UserRating                                                                      int
 	AverageRating                                                                   float64
 	AddedAt                                                                         string
+	OwnedInCWA                                                                      bool
+	CalibreID                                                                       int
 	Shelves                                                                         []string
+}
+
+// bookCols is the shared SELECT column list backing BookRow scans.
+const bookCols = `b.source,b.external_id,b.title,b.author,b.state,COALESCE(b.work_id,''),
+	  COALESCE(b.shelfarr_request_id,''),COALESCE(b.chosen_language,''),b.attempt_count,COALESCE(b.cover_url,''),
+	  COALESCE(b.user_rating,0),COALESCE(b.average_rating,0),COALESCE(b.added_at,''),COALESCE(b.reading_status,''),
+	  COALESCE(b.owned_in_cwa,0),COALESCE(b.calibre_id,0),
+	  COALESCE((SELECT GROUP_CONCAT(shelf, ',') FROM book_shelves bs WHERE bs.source=b.source AND bs.external_id=b.external_id),'')`
+
+// scanBookRows scans rows selected with bookCols (in order) into BookRows.
+func scanBookRows(rows *sql.Rows) ([]BookRow, error) {
+	defer rows.Close()
+	var out []BookRow
+	for rows.Next() {
+		var b BookRow
+		var shelvesCSV string
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &b.UserRating, &b.AverageRating, &b.AddedAt, &b.ReadingStatus, &b.OwnedInCWA, &b.CalibreID, &shelvesCSV); err != nil {
+			return nil, err
+		}
+		if shelvesCSV != "" {
+			b.Shelves = strings.Split(shelvesCSV, ",")
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
 }
 
 // ListBooks returns book rows, newest-updated first. state "" = any state; q ""
@@ -219,11 +247,7 @@ func (s *Store) ListBooks(ctx context.Context, state, q string, limit int) ([]Bo
 	if limit <= 0 {
 		limit = 500
 	}
-	query := `SELECT b.source,b.external_id,b.title,b.author,b.state,COALESCE(b.work_id,''),
-	  COALESCE(b.shelfarr_request_id,''),COALESCE(b.chosen_language,''),b.attempt_count,COALESCE(b.cover_url,''),
-	  COALESCE(b.user_rating,0),COALESCE(b.average_rating,0),COALESCE(b.added_at,''),COALESCE(b.reading_status,''),
-	  COALESCE((SELECT GROUP_CONCAT(shelf, ',') FROM book_shelves bs WHERE bs.source=b.source AND bs.external_id=b.external_id),'')
-	  FROM books b`
+	query := `SELECT ` + bookCols + ` FROM books b`
 	var where []string
 	args := []any{}
 	if state != "" {
@@ -244,20 +268,7 @@ func (s *Store) ListBooks(ctx context.Context, state, q string, limit int) ([]Bo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []BookRow
-	for rows.Next() {
-		var b BookRow
-		var shelvesCSV string
-		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &b.UserRating, &b.AverageRating, &b.AddedAt, &b.ReadingStatus, &shelvesCSV); err != nil {
-			return nil, err
-		}
-		if shelvesCSV != "" {
-			b.Shelves = strings.Split(shelvesCSV, ",")
-		}
-		out = append(out, b)
-	}
-	return out, rows.Err()
+	return scanBookRows(rows)
 }
 
 func (s *Store) IgnoreBook(ctx context.Context, source, externalID string) error {

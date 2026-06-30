@@ -73,8 +73,10 @@ input[type=checkbox],input[type=radio]{width:auto}
 
 /* progress (live sync) */
 .progress{margin:.6rem 0}
-.progress-bar{height:8px;background:#2a2f34;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
-.progress-bar span{display:block;height:100%;width:0;background:var(--active);transition:width .4s ease}
+.progress progress{width:100%;height:10px;-webkit-appearance:none;appearance:none;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:#2a2f34}
+.progress progress::-webkit-progress-bar{background:#2a2f34}
+.progress progress::-webkit-progress-value{background:var(--active)}
+.progress progress::-moz-progress-bar{background:var(--active)}
 #progress-text{margin-top:.35rem}
 
 /* tables */

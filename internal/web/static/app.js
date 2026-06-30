@@ -14,11 +14,42 @@
     });
   }
 
-  function init() {
-    var forms = document.querySelectorAll("[data-sync-form]");
-    if (!forms.length) {
+  function setStatusBadge(running, current) {
+    var el = document.getElementById("run-status");
+    if (!el) return;
+    var span = document.createElement("span");
+    span.className = "badge " + (running ? "badge-active" : "badge-muted");
+    span.textContent = running ? "● Running" : "Idle";
+    el.textContent = "";
+    el.appendChild(span);
+  }
+
+  function renderProgress(p) {
+    var box = document.getElementById("sync-progress");
+    if (!box) return;
+    if (!p || !p.total) {
+      box.hidden = true;
       return;
     }
+    box.hidden = false;
+    var bar = document.getElementById("progress-bar");
+    if (bar) {
+      bar.max = p.total;
+      bar.value = p.done;
+    }
+    var text = document.getElementById("progress-text");
+    if (text) {
+      var parts = ["Processing " + p.done + "/" + p.total];
+      if (p.requested) parts.push("requested " + p.requested);
+      if (p.notFound) parts.push("not found " + p.notFound);
+      var line = parts.join(" · ");
+      if (p.current) line += " — " + p.current;
+      text.textContent = line;
+    }
+  }
+
+  function init() {
+    var forms = document.querySelectorAll("[data-sync-form]");
 
     forms.forEach(function (form) {
       form.addEventListener("submit", function () {
@@ -30,7 +61,9 @@
       });
     });
 
-    var statusEl = document.getElementById("run-status");
+    // Only the dashboard has the status/progress hooks; bail elsewhere.
+    if (!document.getElementById("run-status")) return;
+
     var wasRunning = false;
 
     function poll() {
@@ -39,17 +72,13 @@
           return r.ok ? r.json() : null;
         })
         .then(function (s) {
-          if (!s) {
-            return;
-          }
+          if (!s) return;
           var running = !!s.running;
           setButtonsDisabled(running);
-          if (statusEl) {
-            statusEl.textContent = running ? "Running…" : "Idle";
-          }
+          setStatusBadge(running, "");
+          renderProgress(running ? s.progress : null);
           if (wasRunning && !running) {
-            // a run just finished: reload to show the fresh server-rendered status
-            window.location.reload();
+            window.location.reload(); // run finished: show fresh server-rendered state
             return;
           }
           wasRunning = running;
@@ -60,7 +89,7 @@
     }
 
     poll();
-    setInterval(poll, 2000);
+    setInterval(poll, 1500);
   }
 
   if (document.readyState === "loading") {

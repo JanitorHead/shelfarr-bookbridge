@@ -11,7 +11,7 @@
 <form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button class="btn btn-secondary" data-sync-btn>Dry run</button></form>
 </div>
 
-<div id="sync-progress" class="progress" hidden><div class="progress-bar"><span id="progress-fill"></span></div><div id="progress-text" class="muted"></div></div>
+<div id="sync-progress" class="progress"{{if not .Running}} hidden{{end}}><progress id="progress-bar" value="{{.Prog.Done}}" max="{{if .Prog.Total}}{{.Prog.Total}}{{else}}1{{end}}"></progress><div id="progress-text" class="muted">{{if .Running}}Processing {{.Prog.Done}}/{{.Prog.Total}}{{if .Prog.Requested}} · requested {{.Prog.Requested}}{{end}}{{if .Prog.NotFound}} · not found {{.Prog.NotFound}}{{end}}{{if .Prog.Current}} — {{.Prog.Current}}{{end}}{{end}}</div></div>
 
 <div class="cards">{{range .Cells}}<a class="card accent-{{stateClass .Name}}" href="/queue?state={{.Name}}"><div class="n">{{.N}}</div><div class="muted">{{stateLabel .Name}}</div></a>{{else}}<p class="muted">No books yet — run a sync.</p>{{end}}</div>
 

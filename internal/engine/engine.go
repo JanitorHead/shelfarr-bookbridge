@@ -98,7 +98,11 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 	if err != nil {
 		return rep, err
 	}
-	for _, b := range pending {
+	_ = e.st.BeginProgress(ctx, len(pending))
+	for i, b := range pending {
+		// Surface live progress so the GUI can show "Processing 12/121 …" with the
+		// current title and running counters as the request phase advances.
+		_ = e.st.SetProgress(ctx, i, b.Title, rep.Requested, rep.NotFound, rep.Errors)
 		// Query by clean title+author, not ISBN: a Goodreads ISBN often resolves
 		// to a different-language edition/work in the metadata providers (e.g. a
 		// Spanish ISBN -> the English original), which then fails title matching.
@@ -154,6 +158,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		}
 		_ = e.st.SetRequested(ctx, b, pick.WorkID, id)
 	}
+	_ = e.st.SetProgress(ctx, len(pending), "", rep.Requested, rep.NotFound, rep.Errors)
 	if !dryRun {
 		if err := e.recheckPhase(ctx, &rep); err != nil {
 			return rep, err

@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 5
+const schemaVersion = 6
 
 type Store struct{ db *sql.DB }
 
@@ -83,6 +83,13 @@ INSERT OR IGNORE INTO run_state(id, running) VALUES (1, 0);`,
   requested INTEGER NOT NULL DEFAULT 0, not_found INTEGER NOT NULL DEFAULT 0,
   errors INTEGER NOT NULL DEFAULT 0, summary TEXT NOT NULL DEFAULT '', error_text TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at DESC);`,
+		// v6: live-progress fields on the single run_state row
+		`ALTER TABLE run_state ADD COLUMN total INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE run_state ADD COLUMN done INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE run_state ADD COLUMN current TEXT NOT NULL DEFAULT '';
+ALTER TABLE run_state ADD COLUMN p_requested INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE run_state ADD COLUMN p_not_found INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE run_state ADD COLUMN p_failed INTEGER NOT NULL DEFAULT 0;`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

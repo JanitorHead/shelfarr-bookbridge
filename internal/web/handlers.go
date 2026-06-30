@@ -251,12 +251,13 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	started := r.URL.Query().Get("started") != ""
 	downloading, _ := s.st.ListBooks(ctx, "downloading", "", 8)
 	notFound, _ := s.st.ListBooks(ctx, "not_found", "", 8)
+	prog, _ := s.st.Progress(ctx)
 	s.render(w, r, "dashboard", "Dashboard", map[string]any{
 		"Cells": cells, "NeedsAuth": needsAuth, "Started": started,
 		"Running": running, "StartedAt": startedAt,
 		"Last": last, "HasLast": hasLast, "Recent": recent, "NextRun": next,
 		"Downloading": downloading, "NotFound": notFound,
-		"TotalBooks": total(counts),
+		"TotalBooks": total(counts), "Prog": prog,
 	})
 }
 
@@ -284,19 +285,35 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	running, startedAt, _ := s.st.RunState(ctx)
 	last, hasLast, _ := s.st.LatestRun(ctx)
+	prog, _ := s.st.Progress(ctx)
 	type lastRun struct {
 		At      string `json:"at"`
 		Mode    string `json:"mode"`
 		OK      bool   `json:"ok"`
 		Summary string `json:"summary"`
 	}
+	type progress struct {
+		Total     int    `json:"total"`
+		Done      int    `json:"done"`
+		Current   string `json:"current"`
+		Requested int    `json:"requested"`
+		NotFound  int    `json:"notFound"`
+		Failed    int    `json:"failed"`
+	}
 	resp := struct {
-		Running   bool     `json:"running"`
-		StartedAt string   `json:"startedAt"`
-		LastRun   *lastRun `json:"lastRun"`
+		Running   bool      `json:"running"`
+		StartedAt string    `json:"startedAt"`
+		LastRun   *lastRun  `json:"lastRun"`
+		Progress  *progress `json:"progress"`
 	}{Running: running}
 	if running && !startedAt.IsZero() {
 		resp.StartedAt = startedAt.UTC().Format(time.RFC3339)
+	}
+	if running {
+		resp.Progress = &progress{
+			Total: prog.Total, Done: prog.Done, Current: prog.Current,
+			Requested: prog.Requested, NotFound: prog.NotFound, Failed: prog.Failed,
+		}
 	}
 	if hasLast {
 		resp.LastRun = &lastRun{

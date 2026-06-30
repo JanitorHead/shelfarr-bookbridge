@@ -98,6 +98,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/logout", s.handleLogout)
 	mux.HandleFunc("/settings", s.guard(s.handleSettings))
 	mux.HandleFunc("/actions/sync", s.guard(s.handleSync))
+	mux.HandleFunc("/actions/status", s.guard(s.handleStatus))
 	mux.HandleFunc("/queue", s.guard(s.handleQueue))
 	mux.HandleFunc("/review", s.guard(s.handleReview))
 	mux.HandleFunc("/shelves", s.guard(s.handleShelves))

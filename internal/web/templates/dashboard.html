@@ -1,12 +1,13 @@
 {{define "content"}}<h1>Dashboard</h1>
 {{if .NeedsAuth}}<div class="banner banner-warn">No Goodreads cookie/feed key set — add one in <a href="/settings">Settings</a>.</div>{{end}}
-<p class="run-status">{{if .Running}}<span class="badge badge-active">Running since {{.StartedAt.Format "15:04"}}</span>{{else}}<span class="badge badge-done">Idle</span>{{end}}</p>
+{{if .Started}}<div class="banner banner-ok">Sync started…</div>{{end}}
+<p class="run-status"><span id="run-status">{{if .Running}}<span class="badge badge-active">Running since {{.StartedAt.Format "15:04"}}</span>{{else}}<span class="badge badge-done">Idle</span>{{end}}</span></p>
 {{if .HasLast}}<div class="banner {{if .Last.OK}}banner-ok{{else}}banner-error{{end}}">Last run {{.Last.StartedAt.Format "15:04"}} · {{.Last.Mode}} · {{if .Last.OK}}OK{{else}}error{{end}} · {{.Last.FinishedAt.Sub .Last.StartedAt}}</div>{{else}}<p class="muted">No runs yet — start a sync below.</p>{{end}}
 <p class="muted">Next run: {{if .NextRun.IsZero}}—{{else}}{{.NextRun.Format "Mon 15:04"}}{{end}}</p>
 <div class="cards">{{range .Cells}}<div class="card"><div class="n">{{.N}}</div><div class="muted">{{.Name}}</div></div>{{else}}<p class="muted">No books yet — run a sync.</p>{{end}}</div>
 <h2>Actions</h2>
-<form method="post" action="/actions/sync" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="apply"><button>Sync now</button></form>
-<form method="post" action="/actions/sync" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button class="btn-secondary">Dry run</button></form>
+<form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="apply"><button data-sync-btn>Sync now</button></form>
+<form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button class="btn-secondary" data-sync-btn>Dry run</button></form>
 {{if .Recent}}<h2>Recent runs</h2>
 <table class="table"><thead><tr><th>Started</th><th>Mode</th><th>Result</th><th>New</th><th>Requested</th><th>Not found</th><th>Errors</th></tr></thead>
 <tbody>{{range .Recent}}<tr><td>{{.StartedAt.Format "01-02 15:04"}}</td><td>{{.Mode}}</td><td>{{if .OK}}<span class="badge badge-done">OK</span>{{else}}<span class="badge badge-error">error</span>{{end}}</td><td>{{.New}}</td><td>{{.Requested}}</td><td>{{.NotFound}}</td><td>{{.Errors}}</td></tr>{{end}}</tbody></table>{{end}}

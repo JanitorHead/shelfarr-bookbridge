@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -168,8 +169,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		next, _ = scheduler.Next(sched, time.Now())
 	}
 	needsAuth := s.settingValue("GOODREADS_COOKIE") == "" && s.settingValue("GOODREADS_FEED_KEY") == ""
+	started := r.URL.Query().Get("started") != ""
 	s.render(w, r, "dashboard", "Dashboard", map[string]any{
-		"Cells": cells, "NeedsAuth": needsAuth,
+		"Cells": cells, "NeedsAuth": needsAuth, "Started": started,
 		"Running": running, "StartedAt": startedAt,
 		"Last": last, "HasLast": hasLast, "Recent": recent, "NextRun": next,
 	})
@@ -185,10 +187,44 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 	}
 	r.ParseForm()
 	dryRun := r.PostFormValue("mode") == "dryrun"
+	// Kick the run off in the background so the request returns immediately; the
+	// browser polls /actions/status to follow progress. runOnce/AcquireRun already
+	// serialize, so a collision returns ErrRunInProgress harmlessly in the goroutine.
 	// Run outcomes are persisted at the runOnce choke point (R2) and surfaced via
 	// RunState/LatestRun on the dashboard (R3); nothing to record here.
-	_, _ = s.run(dryRun)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	go func() { _, _ = s.run(dryRun) }()
+	http.Redirect(w, r, "/?started=1", http.StatusSeeOther)
+}
+
+// handleStatus serves the current run state as JSON for app.js polling.
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	running, startedAt, _ := s.st.RunState(ctx)
+	last, hasLast, _ := s.st.LatestRun(ctx)
+	type lastRun struct {
+		At      string `json:"at"`
+		Mode    string `json:"mode"`
+		OK      bool   `json:"ok"`
+		Summary string `json:"summary"`
+	}
+	resp := struct {
+		Running   bool     `json:"running"`
+		StartedAt string   `json:"startedAt"`
+		LastRun   *lastRun `json:"lastRun"`
+	}{Running: running}
+	if running && !startedAt.IsZero() {
+		resp.StartedAt = startedAt.UTC().Format(time.RFC3339)
+	}
+	if hasLast {
+		resp.LastRun = &lastRun{
+			At:      last.StartedAt.UTC().Format(time.RFC3339),
+			Mode:    last.Mode,
+			OK:      last.OK,
+			Summary: last.Summary,
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // requireCSRF returns false (and writes 403) if the POST lacks a valid token.

@@ -106,6 +106,16 @@ func newWebServer(st *store.Store, getenv func(string) string) *web.Server {
 		}
 		return lister.ListShelves(ctx)
 	})
+	srv.SetOwnershipRefresher(func(ctx context.Context) error {
+		cfg, err := effectiveConfig(st, getenv)
+		if err != nil {
+			return err
+		}
+		if !cfg.CWAConfigured() {
+			return fmt.Errorf("CWA is not configured — set the CWA URL, username and password in Settings")
+		}
+		return refreshOwnership(st, cfg, os.Stdout)
+	})
 	return srv
 }
 
@@ -153,9 +163,13 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 		rec.ErrorText = runErr.Error()
 	}
 	_, _ = st.RecordRun(context.Background(), rec)
-	// After a successful real run, push Goodreads shelves into CWA as tags.
+	// After a successful real run, push Goodreads shelves into CWA as tags and
+	// refresh which catalog books are owned in Calibre (for the Library badges).
 	if runErr == nil && !dryRun && cfg.CWAConfigured() {
 		cwaTagPass(st, cfg, os.Stdout)
+		if err := refreshOwnership(st, cfg, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stdout, "[cwa] ownership refresh:", err)
+		}
 	}
 	return rep, runErr
 }
@@ -232,8 +246,14 @@ func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 	}
 }
 
-// bestCalibreMatch finds the Calibre book matching a tracked book by title+author.
+// bestCalibreMatch finds the Calibre book matching a tracked book by title+author
+// (lenient 0.6 threshold, used for tagging books already known to be downloaded).
 func bestCalibreMatch(b store.BookRow, lib []cwa.Book) *cwa.Book {
+	return matchCalibre(b, lib, 0.6)
+}
+
+// matchCalibre returns the best Calibre match for b at or above threshold, else nil.
+func matchCalibre(b store.BookRow, lib []cwa.Book, threshold float64) *cwa.Book {
 	var pick *cwa.Book
 	bestScore := -1.0
 	for i := range lib {
@@ -244,9 +264,44 @@ func bestCalibreMatch(b store.BookRow, lib []cwa.Book) *cwa.Book {
 			pick = c
 		}
 	}
-	if bestScore >= 0.6 {
+	if bestScore >= threshold {
 		return pick
 	}
+	return nil
+}
+
+// refreshOwnership cross-references the whole catalog against the Calibre (CWA)
+// library so the Library can show which books the user actually owns. It uses a
+// stricter match threshold than tagging (0.72) to avoid false "owned" badges.
+func refreshOwnership(st *store.Store, cfg config.Config, out io.Writer) error {
+	if !cfg.CWAConfigured() {
+		return nil
+	}
+	ctx := context.Background()
+	client := cwa.New(cfg.CWAURL, cfg.CWAUsername, cfg.CWAPassword)
+	if err := client.Login(ctx); err != nil {
+		return err
+	}
+	lib, err := client.ListBooks(ctx)
+	if err != nil {
+		return err
+	}
+	books, err := st.ListBooks(ctx, "", "", 1000000) // the whole catalog
+	if err != nil {
+		return err
+	}
+	if err := st.ClearOwnership(ctx); err != nil {
+		return err
+	}
+	matched := 0
+	for _, b := range books {
+		if cal := matchCalibre(b, lib, 0.72); cal != nil {
+			if st.SetOwnership(ctx, b.Source, b.ExternalID, cal.ID) == nil {
+				matched++
+			}
+		}
+	}
+	fmt.Fprintf(out, "[cwa] ownership: %d/%d catalog books matched in Calibre\n", matched, len(books))
 	return nil
 }
 

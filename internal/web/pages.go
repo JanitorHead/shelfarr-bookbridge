@@ -108,8 +108,30 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		"Rows": rows, "Shown": len(rows),
 		"Q": f.Q, "State": f.State, "Status": f.Status, "Tag": f.Tag, "Owned": f.Owned,
 		"StatusChips": statusChips, "OwnChips": ownChips, "TagChips": tagChips,
-		"HasTags": len(tagChips) > 0,
+		"HasTags": len(tagChips) > 0, "CWAOn": s.cfg().CWAConfigured(),
+		"OwnRefreshed": r.URL.Query().Get("owned_refreshed") != "",
+		"Err":          r.URL.Query().Get("err"),
 	})
+}
+
+// handleRefreshOwnership re-runs the CWA ownership cross-reference on demand.
+func (s *Server) handleRefreshOwnership(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/queue", http.StatusSeeOther)
+		return
+	}
+	if !s.localNoSession(r) && !s.requireCSRF(w, r) {
+		return
+	}
+	if s.refreshOwn == nil {
+		http.Redirect(w, r, "/queue?err="+url.QueryEscape("CWA is not configured — set it in Settings"), http.StatusSeeOther)
+		return
+	}
+	if err := s.refreshOwn(context.Background()); err != nil {
+		http.Redirect(w, r, "/queue?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/queue?owned_refreshed=1", http.StatusSeeOther)
 }
 
 func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {

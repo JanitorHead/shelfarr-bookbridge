@@ -34,19 +34,26 @@ type session struct {
 }
 
 type Server struct {
-	st       *store.Store
-	run      Runner
-	discover func(ctx context.Context) ([]sources.Shelf, error)
-	tmpl     *template.Template
-	getenv   func(string) string
-	mu       sync.Mutex
-	sess     map[string]*session
+	st         *store.Store
+	run        Runner
+	discover   func(ctx context.Context) ([]sources.Shelf, error)
+	refreshOwn func(ctx context.Context) error
+	tmpl       *template.Template
+	getenv     func(string) string
+	mu         sync.Mutex
+	sess       map[string]*session
 }
 
 // SetDiscoverer wires the shelf-discovery function (built from effective config
 // in main) so the Shelves page can list the source's shelves as toggles.
 func (s *Server) SetDiscoverer(fn func(ctx context.Context) ([]sources.Shelf, error)) {
 	s.discover = fn
+}
+
+// SetOwnershipRefresher wires the CWA-ownership cross-reference (built from
+// effective config in main) so the Library can refresh ownership on demand.
+func (s *Server) SetOwnershipRefresher(fn func(ctx context.Context) error) {
+	s.refreshOwn = fn
 }
 
 func New(st *store.Store, run Runner) *Server {
@@ -125,6 +132,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/review", s.guard(s.handleReview))
 	mux.HandleFunc("/shelves", s.guard(s.handleShelves))
 	mux.HandleFunc("/shelves/refresh", s.guard(s.handleShelvesRefresh))
+	mux.HandleFunc("/actions/refresh-ownership", s.guard(s.handleRefreshOwnership))
 	mux.HandleFunc("/", s.guard(s.handleDashboard))
 	return securityHeaders(mux)
 }

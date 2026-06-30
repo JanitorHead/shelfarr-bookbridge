@@ -1,9 +1,9 @@
 {{define "content"}}<div class="page-head"><h1>Shelves</h1><span class="muted">source: {{.Source}}</span></div>
 {{if .Saved}}<div class="banner banner-ok">Shelves saved.</div>{{end}}
-{{if .Refreshed}}<div class="banner banner-ok">Found {{.Refreshed}} shelves from {{.Source}}. Toggle the ones you want and Save.</div>{{end}}
+{{if .Refreshed}}<div class="banner banner-ok">Found {{.Refreshed}} shelves from {{.Source}}. Every shelf is added to your Library; toggle on the ones you also want to download.</div>{{end}}
 {{if .Err}}<div class="banner banner-error">Couldn’t list shelves: {{.Err}}</div>{{end}}
 <form method="post" action="/shelves/refresh" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn">↻ Refresh shelves from {{.Source}}</button></form>
-<p class="muted">Toggle the shelves to sync. Newly discovered shelves start off. Per-shelf format/language override the global setting.</p>
+<p class="muted">Your whole {{.Source}} library is ingested into the <a href="/queue">Library</a> regardless of these toggles. A toggle marks a shelf as a <b>download trigger</b>: its books are requested in Shelfarr. Status shelves (to-read, read, currently-reading…) set reading status; the rest become topic tags. Per-shelf format/language override the global setting.</p>
 <form method="post" action="/shelves">
 <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="shelves" value="{{.Slugs}}">
 <div class="shelf-list">

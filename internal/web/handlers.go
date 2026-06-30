@@ -28,8 +28,8 @@ func onoff(b bool) string {
 
 // settingFields are the non-secret settings editable in the GUI (env-var keys).
 var settingFields = []struct {
-	Key, Label, Kind string
-	Options          []string
+	Key, Label, Kind  string
+	Options           []string
 	OnValue, OffValue string
 }{
 	{Key: "SOURCE", Label: "Book source", Kind: "select", Options: []string{"goodreads", "hardcover"}},
@@ -266,11 +266,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	needsAuth := s.settingValue("GOODREADS_COOKIE") == "" && s.settingValue("GOODREADS_FEED_KEY") == ""
 	started := r.URL.Query().Get("started") != ""
+	stopping := r.URL.Query().Get("stopping") != ""
 	downloading, _ := s.st.ListBooks(ctx, "downloading", "", 8)
 	notFound, _ := s.st.ListBooks(ctx, "not_found", "", 8)
 	prog, _ := s.st.Progress(ctx)
 	s.render(w, r, "dashboard", "Dashboard", map[string]any{
-		"Cells": cells, "NeedsAuth": needsAuth, "Started": started,
+		"Cells": cells, "NeedsAuth": needsAuth, "Started": started, "Stopping": stopping,
 		"Running": running, "StartedAt": startedAt,
 		"Last": last, "HasLast": hasLast, "Recent": recent, "NextRun": next,
 		"Downloading": downloading, "NotFound": notFound,
@@ -295,6 +296,19 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 	// RunState/LatestRun on the dashboard (R3); nothing to record here.
 	go func() { _, _ = s.run(dryRun) }()
 	http.Redirect(w, r, "/?started=1", http.StatusSeeOther)
+}
+
+// handleStop asks the in-flight run to stop at the next safe point (between books).
+func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if !s.localNoSession(r) && !s.requireCSRF(w, r) {
+		return
+	}
+	_ = s.st.RequestStop(context.Background())
+	http.Redirect(w, r, "/?stopping=1", http.StatusSeeOther)
 }
 
 // handleStatus serves the current run state as JSON for app.js polling.

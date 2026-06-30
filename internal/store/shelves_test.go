@@ -50,7 +50,7 @@ func TestSchemaVersionMatches(t *testing.T) {
 	if err := s.db.QueryRow("PRAGMA user_version").Scan(&ver); err != nil {
 		t.Fatal(err)
 	}
-	if ver != schemaVersion || schemaVersion != 9 {
-		t.Fatalf("user_version=%d schemaVersion=%d, want 9", ver, schemaVersion)
+	if ver != schemaVersion || schemaVersion != 10 {
+		t.Fatalf("user_version=%d schemaVersion=%d, want 10", ver, schemaVersion)
 	}
 }

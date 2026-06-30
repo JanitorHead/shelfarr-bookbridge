@@ -61,6 +61,17 @@
       });
     });
 
+    var stopForm = document.querySelector("[data-stop-form]");
+    if (stopForm) {
+      stopForm.addEventListener("submit", function () {
+        var b = stopForm.querySelector("[data-stop-btn]");
+        if (b) {
+          b.disabled = true;
+          b.textContent = "Stopping…";
+        }
+      });
+    }
+
     // Only the dashboard has the status/progress hooks; bail elsewhere.
     if (!document.getElementById("run-status")) return;
 
@@ -77,6 +88,10 @@
           setButtonsDisabled(running);
           setStatusBadge(running, "");
           renderProgress(running ? s.progress : null);
+          var stopForm = document.querySelector("[data-stop-form]");
+          if (stopForm) {
+            stopForm.hidden = !running;
+          }
           if (wasRunning && !running) {
             window.location.reload(); // run finished: show fresh server-rendered state
             return;

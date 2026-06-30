@@ -22,7 +22,7 @@ type Engine struct {
 type Report struct {
 	Fetched, New, Requested, NotFound, AlreadyExists int
 	Reconciled, Completed, Failed, Rechecked, Parked int
-	Errors int // per-item transient failures (timeouts, 5xx) — isolated, not fatal
+	Errors                                           int // per-item transient failures (timeouts, 5xx) — isolated, not fatal
 }
 
 func New(src sources.Source, st *store.Store, sh *shelfarr.Client, cfg config.Config) *Engine {
@@ -99,7 +99,12 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		return rep, err
 	}
 	_ = e.st.BeginProgress(ctx, len(pending))
+	stopped := false
 	for i, b := range pending {
+		if e.st.StopRequested(ctx) { // cooperative cancel between books
+			stopped = true
+			break
+		}
 		// Surface live progress so the GUI can show "Processing 12/121 …" with the
 		// current title and running counters as the request phase advances.
 		_ = e.st.SetProgress(ctx, i, b.Title, rep.Requested, rep.NotFound, rep.Errors)
@@ -159,6 +164,9 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		_ = e.st.SetRequested(ctx, b, pick.WorkID, id)
 	}
 	_ = e.st.SetProgress(ctx, len(pending), "", rep.Requested, rep.NotFound, rep.Errors)
+	if stopped {
+		return rep, nil // user asked to stop; skip recheck/reconcile
+	}
 	if !dryRun {
 		if err := e.recheckPhase(ctx, &rep); err != nil {
 			return rep, err
@@ -229,6 +237,9 @@ func (e *Engine) recheckPhase(ctx context.Context, rep *Report) error {
 		return err
 	}
 	for _, b := range items {
+		if e.st.StopRequested(ctx) {
+			return nil
+		}
 		if rep.Requested+rep.Rechecked >= e.cfg.MaxRequestsPerRun {
 			break
 		}
@@ -264,6 +275,9 @@ func (e *Engine) reconcilePhase(ctx context.Context, rep *Report) error {
 		return err
 	}
 	for _, ref := range open {
+		if e.st.StopRequested(ctx) {
+			return nil
+		}
 		st, err := e.sh.GetRequest(ctx, ref.RequestID)
 		if err != nil {
 			if err == shelfarr.ErrRequestNotFound {

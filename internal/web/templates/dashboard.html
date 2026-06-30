@@ -1,6 +1,7 @@
 {{define "content"}}<div class="page-head"><h1>Dashboard</h1>{{if .TotalBooks}}<span class="muted">{{.TotalBooks}} books tracked</span>{{end}}</div>
 {{if .NeedsAuth}}<div class="banner banner-warn">No Goodreads cookie/feed key set — add one in <a href="/settings">Settings</a>.</div>{{end}}
 {{if .Started}}<div class="banner banner-ok">Sync started…</div>{{end}}
+{{if .Stopping}}<div class="banner banner-warn">Stopping after the current book…</div>{{end}}
 
 <div class="statusbar">
 <span id="run-status">{{if .Running}}<span class="badge badge-active">● Running since {{.StartedAt.Format "15:04"}}</span>{{else}}<span class="badge badge-muted">Idle</span>{{end}}</span>
@@ -9,6 +10,7 @@
 <span class="grow"></span>
 <form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="apply"><button class="btn" data-sync-btn>▶ Sync now</button></form>
 <form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button class="btn btn-secondary" data-sync-btn>Dry run</button></form>
+<form method="post" action="/actions/stop" class="inline" data-stop-form{{if not .Running}} hidden{{end}}><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-secondary" data-stop-btn>■ Stop</button></form>
 </div>
 
 <div id="sync-progress" class="progress"{{if not .Running}} hidden{{end}}><progress id="progress-bar" value="{{.Prog.Done}}" max="{{if .Prog.Total}}{{.Prog.Total}}{{else}}1{{end}}"></progress><div id="progress-text" class="muted">{{if .Running}}Processing {{.Prog.Done}}/{{.Prog.Total}}{{if .Prog.Requested}} · requested {{.Prog.Requested}}{{end}}{{if .Prog.NotFound}} · not found {{.Prog.NotFound}}{{end}}{{if .Prog.Current}} — {{.Prog.Current}}{{end}}{{end}}</div></div>

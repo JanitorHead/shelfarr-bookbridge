@@ -38,7 +38,6 @@ var settingFields = []struct {
 	{Key: "GOODREADS_VISIBILITY", Label: "Goodreads visibility (public/private)", Kind: "text"},
 	{Key: "SHELVES", Label: "Shelves (comma-separated)", Kind: "text"},
 	{Key: "FORMAT", Label: "Format (ebook/audiobook)", Kind: "select", Options: []string{"ebook", "audiobook"}},
-	{Key: "SCHEDULE", Label: "Schedule (cron)", Kind: "text"},
 	{Key: "MAX_REQUESTS_PER_RUN", Label: "Max requests per run", Kind: "number"},
 	{Key: "SIMILARITY_THRESHOLD", Label: "Similarity threshold (0-1)", Kind: "number"},
 	{Key: "FIRST_RUN", Label: "First run (baseline/backfill)", Kind: "select", Options: []string{"baseline", "backfill"}},
@@ -55,6 +54,27 @@ var secretFields = []struct{ Key, Label string }{
 	{"GOODREADS_FEED_KEY", "Goodreads RSS feed key"},
 }
 
+// scheduleOption is one entry in the visual schedule preset selector.
+type scheduleOption struct{ Value, Label string }
+
+// schedulePresets are the seven visual schedule choices that replace raw cron.
+var schedulePresets = []scheduleOption{
+	{"off", "Off (no automatic runs)"},
+	{"15min", "Every 15 minutes"},
+	{"30min", "Every 30 minutes"},
+	{"hourly", "Hourly"},
+	{"6h", "Every 6 hours"},
+	{"daily", "Daily at a set time"},
+	{"advanced", "Advanced (raw cron)"},
+}
+
+// scheduleVM is the view-model for the visual schedule control on the settings
+// page (preset selector + daily time + advanced raw cron).
+type scheduleVM struct {
+	Preset, Time, Raw, Next, Error string
+	Presets                        []scheduleOption
+}
+
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	if r.Method == http.MethodPost {
@@ -62,6 +82,21 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		r.ParseForm()
+		// Visual schedule: compose the cron from preset/time/raw before the
+		// generic loop (SCHEDULE is no longer a generic field). On a bad
+		// advanced expression, re-render with an error and save nothing.
+		preset := r.PostFormValue("SCHEDULE_PRESET")
+		timeHHMM := r.PostFormValue("SCHEDULE_TIME")
+		raw := r.PostFormValue("SCHEDULE_RAW")
+		cronExpr, err := composeSchedule(preset, timeHHMM, raw)
+		if err != nil {
+			s.renderSettings(w, r, scheduleVM{
+				Preset: preset, Time: timeHHMM, Raw: raw,
+				Error: "Invalid schedule: " + err.Error(), Presets: schedulePresets,
+			})
+			return
+		}
+		s.st.SetSetting(ctx, "SCHEDULE", cronExpr)
 		for _, f := range settingFields {
 			if f.Kind == "checkbox" {
 				// An unchecked checkbox submits nothing; always write a canonical
@@ -86,6 +121,26 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := s.cfg()
+	preset, timeHHMM := cronToPreset(cfg.Schedule)
+	raw := ""
+	if preset == "advanced" {
+		raw = cfg.Schedule
+	}
+	next := ""
+	if cfg.Schedule != "" {
+		if n, err := scheduler.Next(cfg.Schedule, time.Now()); err == nil {
+			next = n.Format("2006-01-02 15:04")
+		}
+	}
+	s.renderSettings(w, r, scheduleVM{
+		Preset: preset, Time: timeHHMM, Raw: raw, Next: next, Presets: schedulePresets,
+	})
+}
+
+// renderSettings renders the settings page with the given schedule view-model.
+// It is shared by the GET path and the POST error path (invalid schedule).
+func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched scheduleVM) {
+	cfg := s.cfg()
 	type field struct {
 		Key, Label, Kind, Value string
 		Options                 []string
@@ -95,7 +150,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	cur := map[string]string{
 		"SHELFARR_URL": cfg.ShelfarrURL, "GOODREADS_USER_ID": cfg.GoodreadsUserID,
 		"GOODREADS_VISIBILITY": s.settingValue("GOODREADS_VISIBILITY"), "SHELVES": strings.Join(cfg.Shelves, ","),
-		"FORMAT": cfg.Format, "SCHEDULE": cfg.Schedule, "MAX_REQUESTS_PER_RUN": itoa(cfg.MaxRequestsPerRun),
+		"FORMAT": cfg.Format, "MAX_REQUESTS_PER_RUN": itoa(cfg.MaxRequestsPerRun),
 		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),
 		"GUI_PORT": cfg.GUIPort, "AUTH_METHOD": cfg.AuthMethod, "AUTH_REQUIRED": cfg.AuthRequired,
@@ -117,7 +172,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	for _, f := range secretFields {
 		secrets = append(secrets, secret{f.Key, f.Label, s.settingValue(f.Key) != ""})
 	}
-	s.render(w, r, "settings", "Settings", map[string]any{"Fields": fields, "Secrets": secrets})
+	s.render(w, r, "settings", "Settings", map[string]any{"Fields": fields, "Secrets": secrets, "Schedule": sched})
 }
 
 func (s *Server) localNoSession(r *http.Request) bool {

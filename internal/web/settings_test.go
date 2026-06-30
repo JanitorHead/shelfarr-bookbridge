@@ -12,10 +12,11 @@ func TestSettingsSavePersists(t *testing.T) {
 	s := testServer(t)
 	ctx := reqCtx()
 	form := url.Values{
-		"SHELFARR_URL":   {"http://192.168.1.89:5056"},
-		"SHELVES":        {"to-read,sci-fi"},
-		"SCHEDULE":       {"0 */2 * * *"},
-		"SHELFARR_TOKEN": {""}, // empty secret -> unchanged
+		"SHELFARR_URL":    {"http://192.168.1.89:5056"},
+		"SHELVES":         {"to-read,sci-fi"},
+		"SCHEDULE_PRESET": {"advanced"},
+		"SCHEDULE_RAW":    {"0 */2 * * *"},
+		"SHELFARR_TOKEN":  {""}, // empty secret -> unchanged
 	}
 	req := httptest.NewRequest("POST", "/settings", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

@@ -230,6 +230,10 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 		}
 	}()
 
+	if cfg.Schedule == "" {
+		fmt.Fprintln(out, "scheduler disabled (no schedule set)")
+		select {} // block forever (GUI still serves)
+	}
 	sch, err := scheduler.New(cfg.Schedule, cycle)
 	if err != nil {
 		fmt.Fprintln(out, "schedule error:", err)

@@ -384,13 +384,15 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 		printReport(out, "daemon", rep)
 	}
 
-	cycle() // run once immediately (skips gracefully if Shelfarr isn't configured)
 	if *once {
+		cycle() // a single synchronous cycle, then exit
 		return 0
 	}
 
-	// Serve the GUI alongside the scheduler — ALWAYS, even before Shelfarr is
-	// configured, so it can be set up in the GUI.
+	// Serve the GUI FIRST and ALWAYS — so the web UI is reachable immediately, even
+	// while the initial sync is running and even before Shelfarr is configured.
+	// (Previously the startup cycle ran synchronously and blocked the GUI for the
+	// whole first sync, so the web "didn't open" after a restart.)
 	go func() {
 		srv := newWebServer(st, getenv)
 		addr := net.JoinHostPort(cfg.GUIBind, cfg.GUIPort)
@@ -399,6 +401,8 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 			fmt.Fprintln(out, "web error:", err)
 		}
 	}()
+
+	go cycle() // kick off the first sync in the background; never block the GUI
 
 	if cfg.Schedule == "" {
 		fmt.Fprintln(out, "scheduler disabled (no schedule set)")

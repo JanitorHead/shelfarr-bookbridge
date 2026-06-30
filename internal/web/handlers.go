@@ -28,21 +28,25 @@ func onoff(b bool) string {
 }
 
 // settingFields are the non-secret settings editable in the GUI (env-var keys).
-var settingFields = []struct{ Key, Label, Kind string }{
-	{"SHELFARR_URL", "Shelfarr URL", "text"},
-	{"GOODREADS_USER_ID", "Goodreads user id", "text"},
-	{"GOODREADS_VISIBILITY", "Goodreads visibility (public/private)", "text"},
-	{"SHELVES", "Shelves (comma-separated)", "text"},
-	{"FORMAT", "Format (ebook/audiobook)", "text"},
-	{"SCHEDULE", "Schedule (cron)", "text"},
-	{"MAX_REQUESTS_PER_RUN", "Max requests per run", "text"},
-	{"SIMILARITY_THRESHOLD", "Similarity threshold (0-1)", "text"},
-	{"FIRST_RUN", "First run (baseline/backfill)", "text"},
-	{"LANG_INFERENCE", "Language inference (on/off)", "text"},
-	{"SHELFARR_INSECURE", "Allow http to non-loopback Shelfarr (true/false)", "text"},
-	{"GUI_PORT", "GUI port", "text"},
-	{"AUTH_METHOD", "Auth method (forms/none)", "text"},
-	{"AUTH_REQUIRED", "Auth required (enabled/local)", "text"},
+var settingFields = []struct {
+	Key, Label, Kind string
+	Options          []string
+	OnValue, OffValue string
+}{
+	{Key: "SHELFARR_URL", Label: "Shelfarr URL", Kind: "text"},
+	{Key: "GOODREADS_USER_ID", Label: "Goodreads user id", Kind: "text"},
+	{Key: "GOODREADS_VISIBILITY", Label: "Goodreads visibility (public/private)", Kind: "text"},
+	{Key: "SHELVES", Label: "Shelves (comma-separated)", Kind: "text"},
+	{Key: "FORMAT", Label: "Format (ebook/audiobook)", Kind: "select", Options: []string{"ebook", "audiobook"}},
+	{Key: "SCHEDULE", Label: "Schedule (cron)", Kind: "text"},
+	{Key: "MAX_REQUESTS_PER_RUN", Label: "Max requests per run", Kind: "number"},
+	{Key: "SIMILARITY_THRESHOLD", Label: "Similarity threshold (0-1)", Kind: "number"},
+	{Key: "FIRST_RUN", Label: "First run (baseline/backfill)", Kind: "select", Options: []string{"baseline", "backfill"}},
+	{Key: "LANG_INFERENCE", Label: "Language inference (on/off)", Kind: "checkbox", OnValue: "on", OffValue: "off"},
+	{Key: "SHELFARR_INSECURE", Label: "Allow http to non-loopback Shelfarr (true/false)", Kind: "checkbox", OnValue: "true", OffValue: "false"},
+	{Key: "GUI_PORT", Label: "GUI port", Kind: "number"},
+	{Key: "AUTH_METHOD", Label: "Auth method (forms/none)", Kind: "select", Options: []string{"forms", "none"}},
+	{Key: "AUTH_REQUIRED", Label: "Auth required (enabled/local)", Kind: "select", Options: []string{"enabled", "local"}},
 }
 
 var secretFields = []struct{ Key, Label string }{
@@ -59,6 +63,16 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		r.ParseForm()
 		for _, f := range settingFields {
+			if f.Kind == "checkbox" {
+				// An unchecked checkbox submits nothing; always write a canonical
+				// on/off value so a setting can actually be turned OFF.
+				if _, ok := r.PostForm[f.Key]; ok {
+					s.st.SetSetting(ctx, f.Key, f.OnValue)
+				} else {
+					s.st.SetSetting(ctx, f.Key, f.OffValue)
+				}
+				continue
+			}
 			if v := r.PostFormValue(f.Key); v != "" {
 				s.st.SetSetting(ctx, f.Key, v)
 			}
@@ -72,7 +86,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := s.cfg()
-	type field struct{ Key, Label, Value string }
+	type field struct {
+		Key, Label, Kind, Value string
+		Options                 []string
+		Checked                 bool
+	}
 	var fields []field
 	cur := map[string]string{
 		"SHELFARR_URL": cfg.ShelfarrURL, "GOODREADS_USER_ID": cfg.GoodreadsUserID,
@@ -82,8 +100,14 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),
 		"GUI_PORT": cfg.GUIPort, "AUTH_METHOD": cfg.AuthMethod, "AUTH_REQUIRED": cfg.AuthRequired,
 	}
+	checked := map[string]bool{
+		"LANG_INFERENCE": cfg.LangInference, "SHELFARR_INSECURE": cfg.ShelfarrInsecure,
+	}
 	for _, f := range settingFields {
-		fields = append(fields, field{f.Key, f.Label, cur[f.Key]})
+		fields = append(fields, field{
+			Key: f.Key, Label: f.Label, Kind: f.Kind, Value: cur[f.Key],
+			Options: f.Options, Checked: checked[f.Key],
+		})
 	}
 	type secret struct {
 		Key, Label string

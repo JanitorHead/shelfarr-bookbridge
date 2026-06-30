@@ -1,6 +1,6 @@
 {{define "content"}}<h1>Settings</h1>
 <form method="post" action="/settings"><input type="hidden" name="csrf" value="{{.CSRF}}">
-{{range .Fields}}<label>{{.Label}}</label><input name="{{.Key}}" value="{{.Value}}">{{end}}
+{{range $f := .Fields}}<label>{{$f.Label}}</label>{{if eq $f.Kind "select"}}<select name="{{$f.Key}}">{{range $f.Options}}<option value="{{.}}" {{if eq . $f.Value}}selected{{end}}>{{.}}</option>{{end}}</select>{{else if eq $f.Kind "checkbox"}}<input type="checkbox" name="{{$f.Key}}" {{if $f.Checked}}checked{{end}}>{{else if eq $f.Kind "number"}}<input type="number" name="{{$f.Key}}" value="{{$f.Value}}">{{else}}<input name="{{$f.Key}}" value="{{$f.Value}}">{{end}}{{end}}
 <h2>Secrets <span class="muted">(leave blank to keep current)</span></h2>
 {{range .Secrets}}<label>{{.Label}} — {{if .Set}}<span class="set">set</span>{{else}}<span class="unset">not set</span>{{end}}</label><input name="{{.Key}}" type="password" placeholder="••••••••">{{end}}
 <button type="submit">Save</button></form>{{end}}

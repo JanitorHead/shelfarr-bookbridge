@@ -70,13 +70,12 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
-	all, _ := s.st.AllSettings(ctx)
 	cfg := s.cfg()
 	type field struct{ Key, Label, Value string }
 	var fields []field
 	cur := map[string]string{
 		"SHELFARR_URL": cfg.ShelfarrURL, "GOODREADS_USER_ID": cfg.GoodreadsUserID,
-		"GOODREADS_VISIBILITY": all["GOODREADS_VISIBILITY"], "SHELVES": strings.Join(cfg.Shelves, ","),
+		"GOODREADS_VISIBILITY": s.settingValue("GOODREADS_VISIBILITY"), "SHELVES": strings.Join(cfg.Shelves, ","),
 		"FORMAT": cfg.Format, "SCHEDULE": cfg.Schedule, "MAX_REQUESTS_PER_RUN": itoa(cfg.MaxRequestsPerRun),
 		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),
@@ -91,8 +90,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	var secrets []secret
 	for _, f := range secretFields {
-		_, ok, _ := s.st.GetSetting(ctx, f.Key)
-		secrets = append(secrets, secret{f.Key, f.Label, ok})
+		secrets = append(secrets, secret{f.Key, f.Label, s.settingValue(f.Key) != ""})
 	}
 	s.render(w, r, "settings", "Settings", map[string]any{"Fields": fields, "Secrets": secrets})
 }
@@ -163,11 +161,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	lastRun, _, _ := s.st.GetSetting(ctx, "LAST_RUN")
-	cookie, _, _ := s.st.GetSetting(ctx, "GOODREADS_COOKIE")
-	feed, _, _ := s.st.GetSetting(ctx, "GOODREADS_FEED_KEY")
+	needsAuth := s.settingValue("GOODREADS_COOKIE") == "" && s.settingValue("GOODREADS_FEED_KEY") == ""
 	s.render(w, r, "dashboard", "Dashboard", map[string]any{
-		"Cells": cells, "LastRun": lastRun,
-		"NeedsAuth": cookie == "" && feed == "",
+		"Cells": cells, "LastRun": lastRun, "NeedsAuth": needsAuth,
 	})
 }
 

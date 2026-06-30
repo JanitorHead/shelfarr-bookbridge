@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"html/template"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -32,25 +33,34 @@ type session struct {
 }
 
 type Server struct {
-	st   *store.Store
-	run  Runner
-	tmpl *template.Template
-	mu   sync.Mutex
-	sess map[string]*session
+	st     *store.Store
+	run    Runner
+	tmpl   *template.Template
+	getenv func(string) string
+	mu     sync.Mutex
+	sess   map[string]*session
 }
 
 func New(st *store.Store, run Runner) *Server {
 	t := template.Must(template.ParseFS(tmplFS, "templates/*.html"))
-	return &Server{st: st, run: run, tmpl: t, sess: map[string]*session{}}
+	return &Server{st: st, run: run, tmpl: t, getenv: os.Getenv, sess: map[string]*session{}}
 }
 
+// cfg returns the effective config: stored settings overriding the environment,
+// so values bootstrapped via env (docker-compose) are visible/editable in the GUI.
 func (s *Server) cfg() config.Config {
 	all, _ := s.st.AllSettings(context.Background())
-	c, _ := config.LoadEffective(emptyEnv, all) // GUI process: env not used for effective reads
+	c, _ := config.LoadEffective(s.getenv, all)
 	return c
 }
 
-func emptyEnv(string) string { return "" }
+// settingValue returns the effective value of a raw setting key (store over env).
+func (s *Server) settingValue(key string) string {
+	if v, ok, _ := s.st.GetSetting(context.Background(), key); ok && v != "" {
+		return v
+	}
+	return s.getenv(key)
+}
 
 func token() string {
 	b := make([]byte, 24)

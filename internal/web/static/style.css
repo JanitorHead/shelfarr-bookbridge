@@ -71,6 +71,7 @@ input[type=checkbox],input[type=radio]{width:auto}
 .bk-meta{display:flex;gap:.5rem;align-items:center;white-space:nowrap}
 .tag{display:inline-block;background:#2c333a;border:1px solid var(--border);border-radius:5px;padding:0 .35rem;font-size:.74rem;color:#aeb8c2;margin-left:.25rem}
 .lang{text-transform:uppercase;font-size:.74rem}
+.rating{color:#e7c073;font-size:.85rem;white-space:nowrap}.rating.muted{color:#8a94a0}
 .empty{padding:1.2rem 0}
 
 /* progress (live sync) */

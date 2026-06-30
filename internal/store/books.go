@@ -3,9 +3,18 @@ package store
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 )
+
+// fmtTime renders a time as RFC3339, or "" for the zero value.
+func fmtTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("2006-01-02T15:04:05Z07:00")
+}
 
 // Diff records any unseen books (state='new') and returns only those that were
 // not already known. Known books are left untouched. Identity = (source, external_id).
@@ -25,16 +34,34 @@ func (s *Store) Diff(ctx context.Context, books []sources.Book) ([]sources.Book,
 				return nil, err
 			}
 		}
+		addedAt, readAt := fmtTime(b.AddedAt), fmtTime(b.ReadAt)
 		var exists int
 		if err := tx.QueryRowContext(ctx,
 			`SELECT 1 FROM books WHERE source=? AND external_id=?`, b.Source, b.ExternalID).Scan(&exists); err == nil {
+			// Known book: refresh rich metadata (cover, rating, dates, …) without
+			// touching its lifecycle state or updated_at, but only for fields the
+			// source actually provided (don't clobber with blanks).
+			if _, err := tx.ExecContext(ctx, `UPDATE books SET
+			  cover_url      = CASE WHEN ?<>'' THEN ? ELSE cover_url END,
+			  description    = CASE WHEN ?<>'' THEN ? ELSE description END,
+			  year           = CASE WHEN ?<>0  THEN ? ELSE year END,
+			  user_rating    = CASE WHEN ?<>0  THEN ? ELSE user_rating END,
+			  average_rating = CASE WHEN ?<>0  THEN ? ELSE average_rating END,
+			  added_at       = CASE WHEN ?<>'' THEN ? ELSE added_at END,
+			  read_at        = CASE WHEN ?<>'' THEN ? ELSE read_at END
+			  WHERE source=? AND external_id=?`,
+				b.CoverURL, b.CoverURL, b.Description, b.Description, b.Year, b.Year,
+				b.UserRating, b.UserRating, b.AverageRating, b.AverageRating,
+				addedAt, addedAt, readAt, readAt, b.Source, b.ExternalID); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state)
-			 VALUES(?,?,?,?,?,?,?,?, 'new')`,
-			b.Source, b.ExternalID, b.Title, b.Author, b.ISBN10, b.Year, b.CoverURL,
-			b.AddedAt.Format("2006-01-02T15:04:05Z07:00")); err != nil {
+			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state,description,user_rating,average_rating,read_at)
+			 VALUES(?,?,?,?,?,?,?,?, 'new', ?,?,?,?)`,
+			b.Source, b.ExternalID, b.Title, b.Author, b.ISBN10, b.Year, b.CoverURL, addedAt,
+			b.Description, b.UserRating, b.AverageRating, readAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -168,8 +195,11 @@ func (s *Store) IncAttempt(ctx context.Context, source, externalID string) (int,
 
 type BookRow struct {
 	Source, ExternalID, Title, Author, State, WorkID, RequestID, Language, CoverURL string
-	AttemptCount                                                                     int
-	Shelves                                                                          []string
+	AttemptCount                                                                    int
+	UserRating                                                                      int
+	AverageRating                                                                   float64
+	AddedAt                                                                         string
+	Shelves                                                                         []string
 }
 
 // ListBooks returns book rows, newest-updated first. state "" = any state; q ""
@@ -180,6 +210,7 @@ func (s *Store) ListBooks(ctx context.Context, state, q string, limit int) ([]Bo
 	}
 	query := `SELECT b.source,b.external_id,b.title,b.author,b.state,COALESCE(b.work_id,''),
 	  COALESCE(b.shelfarr_request_id,''),COALESCE(b.chosen_language,''),b.attempt_count,COALESCE(b.cover_url,''),
+	  COALESCE(b.user_rating,0),COALESCE(b.average_rating,0),COALESCE(b.added_at,''),
 	  COALESCE((SELECT GROUP_CONCAT(shelf, ',') FROM book_shelves bs WHERE bs.source=b.source AND bs.external_id=b.external_id),'')
 	  FROM books b`
 	var where []string
@@ -207,7 +238,7 @@ func (s *Store) ListBooks(ctx context.Context, state, q string, limit int) ([]Bo
 	for rows.Next() {
 		var b BookRow
 		var shelvesCSV string
-		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &shelvesCSV); err != nil {
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &b.UserRating, &b.AverageRating, &b.AddedAt, &shelvesCSV); err != nil {
 			return nil, err
 		}
 		if shelvesCSV != "" {

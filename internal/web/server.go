@@ -56,6 +56,8 @@ func New(st *store.Store, run Runner) *Server {
 		"initials":   initials,
 		"list":       list,
 		"optLabel":   optLabel,
+		"dateOnly":   dateOnly,
+		"stars":      stars,
 	}
 	t := template.Must(template.New("").Funcs(funcs).ParseFS(tmplFS, "templates/*.html"))
 	return &Server{st: st, run: run, tmpl: t, getenv: os.Getenv, sess: map[string]*session{}}

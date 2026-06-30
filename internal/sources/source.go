@@ -17,6 +17,11 @@ type Book struct {
 	AddedAt    time.Time
 	Year       int
 	CoverURL   string
+	// Rich metadata (best-effort; empty/zero when the source doesn't provide it).
+	Description   string
+	UserRating    int     // the user's own rating, 0–5 (0 = unrated)
+	AverageRating float64 // community average
+	ReadAt        time.Time
 }
 
 // Source fetches books from the enabled shelves.

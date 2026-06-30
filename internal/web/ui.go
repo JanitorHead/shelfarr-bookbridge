@@ -64,6 +64,29 @@ func optLabel(v string) string {
 	}
 }
 
+// dateOnly trims an RFC3339 timestamp to its YYYY-MM-DD date; zero/blank dates
+// (e.g. an unset "0001-01-01") render as empty so the UI can omit them.
+func dateOnly(s string) string {
+	if s == "" || strings.HasPrefix(s, "0001") {
+		return ""
+	}
+	if len(s) >= 10 {
+		return s[:10]
+	}
+	return s
+}
+
+// stars renders an integer rating (0–5) as filled stars.
+func stars(n int) string {
+	if n < 0 {
+		n = 0
+	}
+	if n > 5 {
+		n = 5
+	}
+	return strings.Repeat("★", n)
+}
+
 // total sums all state counts (the size of the tracked library).
 func total(m map[string]int) int {
 	n := 0

@@ -5,10 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/auth"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/engine"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/langdetect"
@@ -16,13 +18,14 @@ import (
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/shelfarr"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources/goodreads"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/store"
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/web"
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Getenv, os.Stdout)) }
 
 func run(args []string, getenv func(string) string, out io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(out, "usage: bookbridge <sync|daemon> [flags]")
+		fmt.Fprintln(out, "usage: bookbridge <sync|daemon|web> [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -30,19 +33,45 @@ func run(args []string, getenv func(string) string, out io.Writer) int {
 		return runSync(args[1:], getenv, out)
 	case "daemon":
 		return runDaemon(args[1:], getenv, out)
+	case "web":
+		return runWeb(args[1:], getenv, out)
 	default:
-		fmt.Fprintln(out, "usage: bookbridge <sync|daemon> [flags]")
+		fmt.Fprintln(out, "usage: bookbridge <sync|daemon|web> [flags]")
 		return 2
 	}
 }
 
-func buildEngine(cfg config.Config, getenv func(string) string) (*engine.Engine, *store.Store, error) {
-	if err := config.CheckTransport(cfg.ShelfarrURL, cfg.ShelfarrInsecure); err != nil {
-		return nil, nil, err
-	}
-	st, err := store.Open(orEnv(getenv, "BB_DB", "/config/bookbridge.db"))
+// effectiveConfig merges env with stored settings.
+func effectiveConfig(st *store.Store, getenv func(string) string) (config.Config, error) {
+	all, err := st.AllSettings(context.Background())
 	if err != nil {
-		return nil, nil, err
+		return config.Config{}, err
+	}
+	return config.LoadEffective(getenv, all)
+}
+
+// bootstrapAdmin seeds AUTH_USERNAME/AUTH_PASSWORD_HASH from env on first start.
+func bootstrapAdmin(st *store.Store, getenv func(string) string) {
+	ctx := context.Background()
+	if _, ok, _ := st.GetSetting(ctx, "AUTH_PASSWORD_HASH"); ok {
+		return
+	}
+	if pw := getenv("AUTH_PASSWORD"); pw != "" {
+		u := getenv("AUTH_USERNAME")
+		if u == "" {
+			u = "admin"
+		}
+		if h, err := auth.Hash(pw); err == nil {
+			st.SetSetting(ctx, "AUTH_USERNAME", u)
+			st.SetSetting(ctx, "AUTH_PASSWORD_HASH", h)
+		}
+	}
+}
+
+// engineFor builds an engine from effective config against an EXISTING store.
+func engineFor(cfg config.Config, st *store.Store, getenv func(string) string) (*engine.Engine, error) {
+	if err := config.CheckTransport(cfg.ShelfarrURL, cfg.ShelfarrInsecure); err != nil {
+		return nil, err
 	}
 	src := goodreads.NewSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
 	sh := shelfarr.New(cfg.ShelfarrURL, cfg.ShelfarrToken, &http.Client{Timeout: 20 * time.Second})
@@ -50,7 +79,7 @@ func buildEngine(cfg config.Config, getenv func(string) string) (*engine.Engine,
 	if cfg.LangInference {
 		e.SetDetector(langdetect.New())
 	}
-	return e, st, nil
+	return e, nil
 }
 
 func printReport(out io.Writer, mode string, rep engine.Report) {
@@ -70,7 +99,14 @@ func runSync(args []string, getenv func(string) string, out io.Writer) int {
 	}
 	dryRun := !*apply || *dry
 
-	cfg, err := config.Load2(getenv)
+	st, err := store.Open(orEnv(getenv, "BB_DB", "/config/bookbridge.db"))
+	if err != nil {
+		fmt.Fprintln(out, "store error:", err)
+		return 1
+	}
+	defer st.Close()
+	bootstrapAdmin(st, getenv)
+	cfg, err := effectiveConfig(st, getenv)
 	if err != nil {
 		fmt.Fprintln(out, "config error:", err)
 		return 1
@@ -78,13 +114,10 @@ func runSync(args []string, getenv func(string) string, out io.Writer) int {
 	ctx := context.Background()
 
 	if *baseline {
-		e, st, err := buildEngine(cfg, getenv)
-		if err != nil {
+		if err := config.CheckTransport(cfg.ShelfarrURL, cfg.ShelfarrInsecure); err != nil {
 			fmt.Fprintln(out, "error:", err)
 			return 1
 		}
-		defer st.Close()
-		_ = e
 		src := goodreads.NewSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
 		books, err := src.Fetch(ctx, cfg.Shelves)
 		if err != nil {
@@ -105,12 +138,11 @@ func runSync(args []string, getenv func(string) string, out io.Writer) int {
 		return 0
 	}
 
-	e, st, err := buildEngine(cfg, getenv)
+	e, err := engineFor(cfg, st, getenv)
 	if err != nil {
 		fmt.Fprintln(out, "error:", err)
 		return 1
 	}
-	defer st.Close()
 	rep, err := e.Run(ctx, dryRun)
 	if err != nil {
 		fmt.Fprintln(out, "run error:", err)
@@ -131,17 +163,23 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	cfg, err := config.Load2(getenv)
+	st, err := store.Open(orEnv(getenv, "BB_DB", "/config/bookbridge.db"))
+	if err != nil {
+		fmt.Fprintln(out, "store error:", err)
+		return 1
+	}
+	defer st.Close()
+	bootstrapAdmin(st, getenv)
+	cfg, err := effectiveConfig(st, getenv)
 	if err != nil {
 		fmt.Fprintln(out, "config error:", err)
 		return 1
 	}
-	e, st, err := buildEngine(cfg, getenv)
+	e, err := engineFor(cfg, st, getenv)
 	if err != nil {
 		fmt.Fprintln(out, "error:", err)
 		return 1
 	}
-	defer st.Close()
 
 	cycle := func() {
 		rep, err := e.Run(context.Background(), false)
@@ -156,6 +194,26 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 	if *once {
 		return 0
 	}
+
+	// serve the GUI alongside the scheduler so one container serves both
+	go func() {
+		runner := func(dryRun bool) (engine.Report, error) {
+			rcfg, err := effectiveConfig(st, getenv)
+			if err != nil {
+				return engine.Report{}, err
+			}
+			e2, err := engineFor(rcfg, st, getenv)
+			if err != nil {
+				return engine.Report{}, err
+			}
+			return e2.Run(context.Background(), dryRun)
+		}
+		srv := web.New(st, runner)
+		addr := net.JoinHostPort(cfg.GUIBind, cfg.GUIPort)
+		fmt.Fprintf(out, "BookBridge GUI on http://%s\n", addr)
+		http.ListenAndServe(addr, srv.Handler())
+	}()
+
 	sch, err := scheduler.New(cfg.Schedule, cycle)
 	if err != nil {
 		fmt.Fprintln(out, "schedule error:", err)
@@ -165,6 +223,36 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 	defer sch.Stop()
 	fmt.Fprintf(out, "daemon scheduled on %q; waiting...\n", cfg.Schedule)
 	select {} // block forever
+}
+
+func runWeb(args []string, getenv func(string) string, out io.Writer) int {
+	st, err := store.Open(orEnv(getenv, "BB_DB", "/config/bookbridge.db"))
+	if err != nil {
+		fmt.Fprintln(out, "store error:", err)
+		return 1
+	}
+	defer st.Close()
+	bootstrapAdmin(st, getenv)
+	runner := func(dryRun bool) (engine.Report, error) {
+		cfg, err := effectiveConfig(st, getenv)
+		if err != nil {
+			return engine.Report{}, err
+		}
+		e, err := engineFor(cfg, st, getenv)
+		if err != nil {
+			return engine.Report{}, err
+		}
+		return e.Run(context.Background(), dryRun)
+	}
+	srv := web.New(st, runner)
+	cfg, _ := effectiveConfig(st, getenv)
+	addr := net.JoinHostPort(cfg.GUIBind, cfg.GUIPort)
+	fmt.Fprintf(out, "BookBridge GUI on http://%s\n", addr)
+	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+		fmt.Fprintln(out, "web error:", err)
+		return 1
+	}
+	return 0
 }
 
 func orEnv(get func(string) string, k, def string) string {

@@ -1,6 +1,6 @@
 services:
   bookbridge:
-    image: bookbridge:latest
+    image: ghcr.io/janitorhead/shelfarr-bookbridge:latest
     container_name: bookbridge
     restart: unless-stopped
     volumes:

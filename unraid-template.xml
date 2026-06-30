@@ -9,6 +9,7 @@
   <Support>https://github.com/JanitorHead/shelfarr-bookbridge/issues</Support>
   <Overview>Syncs your Goodreads shelves to Shelfarr as ebook requests. RECOMMENDED: just set the port + config path, start the container, then open the WebUI (port 7373) and configure your Shelfarr URL/token and Goodreads user id/cookie in Settings. Doing it in the GUI is best because the Goodreads cookie and tokens expire — you update them in the GUI without editing/restarting the container. Every variable below is an OPTIONAL bootstrap shortcut; the GUI (saved in /config) is the source of truth and overrides them.</Overview>
   <Category>MediaApp:Books</Category>
+  <Icon>https://raw.githubusercontent.com/JanitorHead/shelfarr-bookbridge/main/icon.png</Icon>
   <WebUI>http://[IP]:[PORT:7373]/</WebUI>
   <Config Name="Config Path" Target="/config" Default="/mnt/user/appdata/shelfarr-bookbridge" Mode="rw" Description="Persistent state (SQLite) + your settings/secrets. Keep this." Type="Path" Display="always" Required="true"/>
   <Config Name="WebUI Port" Target="7373" Default="7373" Mode="tcp" Description="Web GUI port" Type="Port" Display="always" Required="true"/>

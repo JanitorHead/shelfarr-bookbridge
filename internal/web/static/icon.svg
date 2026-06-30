@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a7bd5"/>
+      <stop offset="1" stop-color="#16335a"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="url(#bg)"/>
+  <!-- open book -->
+  <path d="M128 74 C103 60 72 58 44 68 L44 150 C72 140 103 142 128 156 Z" fill="#f7f2e4"/>
+  <path d="M128 74 C153 60 184 58 212 68 L212 150 C184 140 153 142 128 156 Z" fill="#e7dfca"/>
+  <path d="M128 74 L128 156" stroke="#c4ba9c" stroke-width="3" fill="none"/>
+  <path d="M60 88 C80 82 100 82 116 90" stroke="#cdc3a8" stroke-width="3" fill="none"/>
+  <path d="M60 106 C80 100 100 100 116 108" stroke="#cdc3a8" stroke-width="3" fill="none"/>
+  <path d="M140 90 C156 82 176 82 196 88" stroke="#b7ac8d" stroke-width="3" fill="none"/>
+  <path d="M140 108 C156 100 176 100 196 106" stroke="#b7ac8d" stroke-width="3" fill="none"/>
+  <!-- download arrow -->
+  <rect x="119" y="166" width="18" height="28" rx="4" fill="#6fe3bc"/>
+  <path d="M99 186 L128 218 L157 186 Z" fill="#6fe3bc"/>
+</svg>

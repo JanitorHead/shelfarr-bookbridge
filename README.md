@@ -1,7 +1,12 @@
+<img src="icon.png" width="96" align="left" alt="BookBridge logo">
+
 # shelfarr-bookbridge
 
 Watches your Goodreads shelves and creates **ebook** download requests in
-[Shelfarr](https://shelfarr.org). Self-hosted, single Docker container.
+[Shelfarr](https://shelfarr.org). Self-hosted, single Docker container with a web GUI.
+
+<br clear="left">
+
 
 ## How it works
 

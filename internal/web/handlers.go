@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -168,6 +169,33 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"Cells": cells, "LastRun": lastRun,
 		"NeedsAuth": cookie == "" && feed == "",
 	})
+}
+
+func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if !s.localNoSession(r) && !s.requireCSRF(w, r) {
+		return
+	}
+	r.ParseForm()
+	dryRun := r.PostFormValue("mode") == "dryrun"
+	rep, err := s.run(dryRun)
+	mode := "apply"
+	if dryRun {
+		mode = "dry-run"
+	}
+	var summary string
+	if err != nil {
+		summary = fmt.Sprintf("[%s] error: %v", mode, err)
+	} else {
+		summary = fmt.Sprintf("[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d",
+			mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors,
+			rep.Reconciled, rep.Completed, rep.Failed, rep.Rechecked, rep.Parked)
+	}
+	s.st.SetSetting(context.Background(), "LAST_RUN", summary)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // requireCSRF returns false (and writes 403) if the POST lacks a valid token.

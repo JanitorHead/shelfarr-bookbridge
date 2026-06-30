@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>shelfarr-bookbridge</Name>
-  <Repository>ghcr.io/janitorhead/shelfarr-bookbridge:latest</Repository>
-  <Registry>https://ghcr.io/janitorhead/shelfarr-bookbridge</Registry>
+  <Repository>janitorhead/shelfarr-bookbridge:latest</Repository>
+  <Registry>https://hub.docker.com/r/janitorhead/shelfarr-bookbridge</Registry>
   <Project>https://github.com/JanitorHead/shelfarr-bookbridge</Project>
   <Network>bridge</Network>
   <Privileged>false</Privileged>

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -62,10 +61,15 @@ func loadFrom(get func(string) string) (Config, error) {
 			c.MaxRequestsPerRun = n
 		}
 	}
-	if c.ShelfarrURL == "" || c.ShelfarrToken.Reveal() == "" {
-		return c, fmt.Errorf("SHELFARR_URL and SHELFARR_TOKEN are required")
-	}
+	// Shelfarr URL/token are NOT required at load time: the daemon + GUI must
+	// start without them so they can be configured in the GUI. Use
+	// ShelfarrConfigured() before running a sync.
 	return c, nil
+}
+
+// ShelfarrConfigured reports whether the Shelfarr URL + token are set.
+func (c Config) ShelfarrConfigured() bool {
+	return c.ShelfarrURL != "" && c.ShelfarrToken.Reveal() != ""
 }
 
 func splitCSV(s string) []string {

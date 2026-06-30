@@ -82,6 +82,24 @@ func engineFor(cfg config.Config, st *store.Store, getenv func(string) string) (
 	return e, nil
 }
 
+// runOnce builds the engine from effective config and runs one cycle. It returns
+// a clear error (without crashing the process) when Shelfarr is not configured
+// yet, so the daemon/GUI keeps running until you set it up in Settings.
+func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.Report, error) {
+	cfg, err := effectiveConfig(st, getenv)
+	if err != nil {
+		return engine.Report{}, err
+	}
+	if !cfg.ShelfarrConfigured() {
+		return engine.Report{}, fmt.Errorf("Shelfarr is not configured yet — open the GUI and set the Shelfarr URL + token in Settings")
+	}
+	e, err := engineFor(cfg, st, getenv)
+	if err != nil {
+		return engine.Report{}, err
+	}
+	return e.Run(context.Background(), dryRun)
+}
+
 func printReport(out io.Writer, mode string, rep engine.Report) {
 	fmt.Fprintf(out, "[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d\n",
 		mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors,
@@ -114,10 +132,7 @@ func runSync(args []string, getenv func(string) string, out io.Writer) int {
 	ctx := context.Background()
 
 	if *baseline {
-		if err := config.CheckTransport(cfg.ShelfarrURL, cfg.ShelfarrInsecure); err != nil {
-			fmt.Fprintln(out, "error:", err)
-			return 1
-		}
+		// baseline only reads Goodreads + marks the store; it does not touch Shelfarr.
 		src := goodreads.NewSource(cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
 		books, err := src.Fetch(ctx, cfg.Shelves)
 		if err != nil {
@@ -138,12 +153,7 @@ func runSync(args []string, getenv func(string) string, out io.Writer) int {
 		return 0
 	}
 
-	e, err := engineFor(cfg, st, getenv)
-	if err != nil {
-		fmt.Fprintln(out, "error:", err)
-		return 1
-	}
-	rep, err := e.Run(ctx, dryRun)
+	rep, err := runOnce(st, getenv, dryRun)
 	if err != nil {
 		fmt.Fprintln(out, "run error:", err)
 		return 1
@@ -175,43 +185,30 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 		fmt.Fprintln(out, "config error:", err)
 		return 1
 	}
-	e, err := engineFor(cfg, st, getenv)
-	if err != nil {
-		fmt.Fprintln(out, "error:", err)
-		return 1
-	}
 
 	cycle := func() {
-		rep, err := e.Run(context.Background(), false)
+		rep, err := runOnce(st, getenv, false)
 		if err != nil {
-			fmt.Fprintln(out, "run error:", err)
+			fmt.Fprintln(out, "[daemon]", err)
 			return
 		}
 		printReport(out, "daemon", rep)
 	}
 
-	cycle() // run once immediately
+	cycle() // run once immediately (skips gracefully if Shelfarr isn't configured)
 	if *once {
 		return 0
 	}
 
-	// serve the GUI alongside the scheduler so one container serves both
+	// Serve the GUI alongside the scheduler — ALWAYS, even before Shelfarr is
+	// configured, so it can be set up in the GUI.
 	go func() {
-		runner := func(dryRun bool) (engine.Report, error) {
-			rcfg, err := effectiveConfig(st, getenv)
-			if err != nil {
-				return engine.Report{}, err
-			}
-			e2, err := engineFor(rcfg, st, getenv)
-			if err != nil {
-				return engine.Report{}, err
-			}
-			return e2.Run(context.Background(), dryRun)
-		}
-		srv := web.New(st, runner)
+		srv := web.New(st, func(dryRun bool) (engine.Report, error) { return runOnce(st, getenv, dryRun) })
 		addr := net.JoinHostPort(cfg.GUIBind, cfg.GUIPort)
 		fmt.Fprintf(out, "BookBridge GUI on http://%s\n", addr)
-		http.ListenAndServe(addr, srv.Handler())
+		if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+			fmt.Fprintln(out, "web error:", err)
+		}
 	}()
 
 	sch, err := scheduler.New(cfg.Schedule, cycle)
@@ -233,18 +230,7 @@ func runWeb(args []string, getenv func(string) string, out io.Writer) int {
 	}
 	defer st.Close()
 	bootstrapAdmin(st, getenv)
-	runner := func(dryRun bool) (engine.Report, error) {
-		cfg, err := effectiveConfig(st, getenv)
-		if err != nil {
-			return engine.Report{}, err
-		}
-		e, err := engineFor(cfg, st, getenv)
-		if err != nil {
-			return engine.Report{}, err
-		}
-		return e.Run(context.Background(), dryRun)
-	}
-	srv := web.New(st, runner)
+	srv := web.New(st, func(dryRun bool) (engine.Report, error) { return runOnce(st, getenv, dryRun) })
 	cfg, _ := effectiveConfig(st, getenv)
 	addr := net.JoinHostPort(cfg.GUIBind, cfg.GUIPort)
 	fmt.Fprintf(out, "BookBridge GUI on http://%s\n", addr)

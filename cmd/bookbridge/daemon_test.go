@@ -41,14 +41,16 @@ func TestRunDaemonOnce(t *testing.T) {
 }
 
 func TestRunDaemonRefusesInsecureTransport(t *testing.T) {
+	// The daemon must not crash on a bad config; it logs the refusal per cycle
+	// and keeps serving the GUI. With --once it reports the error and exits 0.
 	env := map[string]string{
 		"SHELFARR_URL": "http://192.168.1.5:3000", "SHELFARR_TOKEN": "shf_t",
 		"GOODREADS_USER_ID": "42", "SHELVES": "to-read",
 		"BB_DB": filepath.Join(t.TempDir(), "bb.db"),
 	}
 	var out strings.Builder
-	code := run([]string{"daemon", "--once"}, func(k string) string { return env[k] }, &out)
-	if code == 0 {
-		t.Fatalf("expected non-zero exit for insecure transport, out=%s", out.String())
+	run([]string{"daemon", "--once"}, func(k string) string { return env[k] }, &out)
+	if !strings.Contains(out.String(), "cleartext") {
+		t.Fatalf("daemon should report refusing insecure (cleartext) transport, got: %s", out.String())
 	}
 }

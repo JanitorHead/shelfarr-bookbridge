@@ -24,8 +24,14 @@ func TestLoadDefaultsAndParsing(t *testing.T) {
 	}
 }
 
-func TestLoadMissingRequired(t *testing.T) {
-	if _, err := loadFrom(func(string) string { return "" }); err == nil {
-		t.Fatal("expected error when SHELFARR_URL missing")
+func TestMissingShelfarrIsNotALoadError(t *testing.T) {
+	// The daemon/GUI must start without Shelfarr config so it can be set up in
+	// the GUI; missing URL/token is reported by ShelfarrConfigured(), not Load.
+	c, err := loadFrom(func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("missing Shelfarr config must not error at load: %v", err)
+	}
+	if c.ShelfarrConfigured() {
+		t.Fatal("ShelfarrConfigured() should be false when URL/token are empty")
 	}
 }

@@ -259,6 +259,59 @@ func (c *Client) editParam(ctx context.Context, param string, id int, value stri
 	return nil
 }
 
+// readCbRe finds the "have read" checkbox on a book detail page; a standalone
+// `checked` attribute (not data-checked) means the book is marked read.
+var readCbRe = regexp.MustCompile(`<input[^>]*id="have_read_cb"[^>]*>`)
+var readCheckedRe = regexp.MustCompile(`\schecked(\s|>|=)`)
+
+// IsRead reports whether a Calibre book is marked read (Calibre-Web's native
+// read flag), read from the book detail page.
+func (c *Client) IsRead(ctx context.Context, id int) (bool, error) {
+	req, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/book/%d", c.base, id), nil)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("CWA book page HTTP %d", resp.StatusCode)
+	}
+	tag := readCbRe.Find(body)
+	if tag == nil {
+		return false, fmt.Errorf("CWA: no read control on book %d", id)
+	}
+	return readCheckedRe.Match(tag), nil
+}
+
+// MarkRead sets Calibre-Web's native read flag for a book. It is idempotent and
+// only ever marks read (never un-reads): if the book is already read, it no-ops,
+// so it never undoes a read state the user set manually.
+func (c *Client) MarkRead(ctx context.Context, id int) error {
+	read, err := c.IsRead(ctx, id)
+	if err != nil {
+		return err
+	}
+	if read {
+		return nil
+	}
+	form := url.Values{"csrf_token": {c.csrf}}
+	req, _ := http.NewRequestWithContext(ctx, "POST",
+		fmt.Sprintf("%s/ajax/toggleread/%d", c.base, id), strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-CSRFToken", c.csrf)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("CWA toggleread HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // SplitTags parses CWA's comma-separated tag string.
 func SplitTags(s string) []string {
 	var out []string

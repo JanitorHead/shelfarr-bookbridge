@@ -10,7 +10,7 @@ import (
 func (s *Store) DoneUntaggedForCWA(ctx context.Context) ([]BookRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
 	  SELECT b.source, b.external_id, b.title, b.author,
-	    COALESCE(b.user_rating,0), COALESCE(b.added_at,''),
+	    COALESCE(b.user_rating,0), COALESCE(b.added_at,''), COALESCE(b.reading_status,''),
 	    COALESCE((SELECT GROUP_CONCAT(shelf, ',') FROM book_shelves bs
 	              WHERE bs.source=b.source AND bs.external_id=b.external_id),'')
 	  FROM books b
@@ -23,7 +23,7 @@ func (s *Store) DoneUntaggedForCWA(ctx context.Context) ([]BookRow, error) {
 	for rows.Next() {
 		var b BookRow
 		var shelvesCSV string
-		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.UserRating, &b.AddedAt, &shelvesCSV); err != nil {
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.UserRating, &b.AddedAt, &b.ReadingStatus, &shelvesCSV); err != nil {
 			return nil, err
 		}
 		if shelvesCSV != "" {

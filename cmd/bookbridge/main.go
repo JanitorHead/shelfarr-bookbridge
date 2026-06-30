@@ -174,10 +174,27 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 	return rep, runErr
 }
 
-// cwaTagPass mirrors each downloaded ('done') book's Goodreads shelves into the
-// Calibre library via CWA: it adds the book to a Calibre-Web Shelf named after
-// each Goodreads shelf (creating the shelf if needed) AND sets "gr:<shelf>" tags
-// (merged with existing tags). Each book is processed at most once (cwa_tagged).
+// statusShelfName maps a reading-list (status) shelf slug to the canonical
+// Calibre-Web Shelf name it should mirror into. "read" returns ok=false because
+// finished books are tracked by the native read flag, not a shelf.
+func statusShelfName(slug string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(slug)) {
+	case "to-read", "want-to-read":
+		return "To Read", true
+	case "currently-reading", "reading":
+		return "Currently Reading", true
+	case "did-not-finish", "dnf":
+		return "Did Not Finish", true
+	default:
+		return "", false
+	}
+}
+
+// cwaTagPass syncs each downloaded ('done') book into the Calibre library via CWA
+// using each field's native home: TOPIC shelves → Calibre tags (subject metadata),
+// reading-list STATUS shelves → Calibre-Web Shelves (personal reading lists), and
+// the "read" status → Calibre's native read flag. Rating and date-added are pushed
+// too. Each book is processed at most once (cwa_tagged).
 func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 	ctx := context.Background()
 	pending, err := st.DoneUntaggedForCWA(ctx)
@@ -215,8 +232,15 @@ func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 		if cal == nil {
 			continue // not in the Calibre library yet
 		}
+		// Reading-list (status) shelves → Calibre-Web Shelves, the native home for
+		// a personal reading workflow. The "read" status is handled by the read
+		// flag below, not as a shelf.
 		for _, shelf := range b.Shelves {
-			id, err := ensureShelf(shelf)
+			name, ok := statusShelfName(shelf)
+			if !ok {
+				continue
+			}
+			id, err := ensureShelf(name)
 			if err != nil {
 				fmt.Fprintln(out, "[cwa]", err)
 				continue
@@ -225,8 +249,18 @@ func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 				fmt.Fprintln(out, "[cwa]", err)
 			}
 		}
-		if err := client.SetTags(ctx, cal.ID, mergeGRTags(cal.Tags, b.Shelves)); err != nil {
-			fmt.Fprintln(out, "[cwa]", err)
+		// Topic (non-status) shelves → Calibre tags, the native home for subject
+		// metadata. Status shelves never become tags.
+		if topics := store.TopicTags(b.Shelves); len(topics) > 0 {
+			if err := client.SetTags(ctx, cal.ID, mergeGRTags(cal.Tags, topics)); err != nil {
+				fmt.Fprintln(out, "[cwa]", err)
+			}
+		}
+		// Finished books → Calibre's native read flag (idempotent; never un-reads).
+		if b.ReadingStatus == "read" {
+			if err := client.MarkRead(ctx, cal.ID); err != nil {
+				fmt.Fprintln(out, "[cwa]", err)
+			}
 		}
 		if b.UserRating > 0 {
 			if err := client.SetRating(ctx, cal.ID, b.UserRating); err != nil {
@@ -242,7 +276,7 @@ func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 		done++
 	}
 	if done > 0 {
-		fmt.Fprintf(out, "[cwa] mirrored %d book(s) into Calibre shelves + tags\n", done)
+		fmt.Fprintf(out, "[cwa] synced %d book(s) to Calibre (topic tags, reading-list shelves, read flag)\n", done)
 	}
 }
 

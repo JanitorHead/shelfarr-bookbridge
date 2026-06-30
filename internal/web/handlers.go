@@ -46,7 +46,7 @@ var settingFields = []struct {
 	{Key: "GUI_PORT", Label: "GUI port", Kind: "number"},
 	{Key: "AUTH_METHOD", Label: "Auth method (forms/none)", Kind: "select", Options: []string{"forms", "none"}},
 	{Key: "AUTH_REQUIRED", Label: "Auth required (enabled/local)", Kind: "select", Options: []string{"enabled", "local"}},
-	{Key: "CWA_ENABLED", Label: "Mirror Goodreads shelves into Calibre-Web-Automated (shelves + gr: tags)", Kind: "checkbox", OnValue: "true", OffValue: "false"},
+	{Key: "CWA_ENABLED", Label: "Sync to Calibre-Web-Automated (topics→tags, reading lists→shelves, read→read flag, rating + date)", Kind: "checkbox", OnValue: "true", OffValue: "false"},
 	{Key: "CWA_URL", Label: "CWA URL (e.g. http://192.168.1.10:8083)", Kind: "text"},
 	{Key: "CWA_USERNAME", Label: "CWA username", Kind: "text"},
 	{Key: "CWA_DATE_COLUMN", Label: "CWA date custom-column id (optional, e.g. 1 — pushes Goodreads date added)", Kind: "text"},

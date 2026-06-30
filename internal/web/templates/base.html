@@ -2,5 +2,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BookBridge — {{.Title}}</title><link rel="icon" type="image/svg+xml" href="/static/icon.svg"><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
 <body><header><a class="brand" href="/"><img src="/static/icon.svg" width="24" height="24" alt="">BookBridge</a>
-{{if .Authed}}<nav><a href="/">Dashboard</a><a href="/settings">Settings</a><a href="/shelves">Shelves</a><a href="/queue">Queue</a><a href="/review">Review</a><form method="post" action="/logout" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><button>Logout</button></form></nav>{{end}}
+{{if .Authed}}<nav>
+<a href="/" {{if eq .Active "dashboard"}}class="active"{{end}}>Dashboard</a>
+<a href="/queue" {{if eq .Active "queue"}}class="active"{{end}}>Library</a>
+<a href="/review" {{if eq .Active "review"}}class="active"{{end}}>Review</a>
+<a href="/shelves" {{if eq .Active "shelves"}}class="active"{{end}}>Shelves</a>
+<a href="/settings" {{if eq .Active "settings"}}class="active"{{end}}>Settings</a>
+{{if .HasSession}}<form method="post" action="/logout" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn-secondary">Logout</button></form>{{end}}
+</nav>{{end}}
 </header><main>{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}{{template "content" .}}</main></body></html>{{end}}

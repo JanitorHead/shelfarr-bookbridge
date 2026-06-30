@@ -1,15 +1,25 @@
-{{define "content"}}<h1>Dashboard</h1>
+{{define "content"}}<div class="page-head"><h1>Dashboard</h1>{{if .TotalBooks}}<span class="muted">{{.TotalBooks}} books tracked</span>{{end}}</div>
 {{if .NeedsAuth}}<div class="banner banner-warn">No Goodreads cookie/feed key set — add one in <a href="/settings">Settings</a>.</div>{{end}}
 {{if .Started}}<div class="banner banner-ok">Sync started…</div>{{end}}
-<p class="run-status"><span id="run-status">{{if .Running}}<span class="badge badge-active">Running since {{.StartedAt.Format "15:04"}}</span>{{else}}<span class="badge badge-done">Idle</span>{{end}}</span></p>
-{{if .HasLast}}<div class="banner {{if .Last.OK}}banner-ok{{else}}banner-error{{end}}">Last run {{.Last.StartedAt.Format "15:04"}} · {{.Last.Mode}} · {{if .Last.OK}}OK{{else}}error{{end}} · {{.Last.FinishedAt.Sub .Last.StartedAt}}</div>{{else}}<p class="muted">No runs yet — start a sync below.</p>{{end}}
-<p class="muted">Next run: {{if .NextRun.IsZero}}—{{else}}{{.NextRun.Format "Mon 15:04"}}{{end}}</p>
-<div class="cards">{{range .Cells}}<div class="card"><div class="n">{{.N}}</div><div class="muted">{{.Name}}</div></div>{{else}}<p class="muted">No books yet — run a sync.</p>{{end}}</div>
-<h2>Actions</h2>
-<form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="apply"><button data-sync-btn>Sync now</button></form>
-<form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button class="btn-secondary" data-sync-btn>Dry run</button></form>
+
+<div class="statusbar">
+<span id="run-status">{{if .Running}}<span class="badge badge-active">● Running since {{.StartedAt.Format "15:04"}}</span>{{else}}<span class="badge badge-muted">Idle</span>{{end}}</span>
+{{if .HasLast}}<span class="badge badge-{{if .Last.OK}}ok{{else}}error{{end}}">Last {{.Last.StartedAt.Format "15:04"}} · {{.Last.Mode}} · {{if .Last.OK}}OK{{else}}error{{end}}</span>{{end}}
+<span class="muted">Next run: {{if .NextRun.IsZero}}—{{else}}{{.NextRun.Format "Mon 15:04"}}{{end}}</span>
+<span class="grow"></span>
+<form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="apply"><button class="btn" data-sync-btn>▶ Sync now</button></form>
+<form method="post" action="/actions/sync" class="inline" data-sync-form><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button class="btn btn-secondary" data-sync-btn>Dry run</button></form>
+</div>
+
+<div id="sync-progress" class="progress" hidden><div class="progress-bar"><span id="progress-fill"></span></div><div id="progress-text" class="muted"></div></div>
+
+<div class="cards">{{range .Cells}}<a class="card accent-{{stateClass .Name}}" href="/queue?state={{.Name}}"><div class="n">{{.N}}</div><div class="muted">{{stateLabel .Name}}</div></a>{{else}}<p class="muted">No books yet — run a sync.</p>{{end}}</div>
+
+{{if .Downloading}}<h2>Downloading now</h2><div class="booklist compact">{{range .Downloading}}{{template "bookrow" .}}{{end}}</div>{{end}}
+{{if .NotFound}}<div class="page-head"><h2>Needs attention</h2><a class="muted" href="/review">review all →</a></div><div class="booklist compact">{{range .NotFound}}{{template "bookrow" .}}{{end}}</div>{{end}}
+
 {{if .Recent}}<h2>Recent runs</h2>
 <table class="table"><thead><tr><th>Started</th><th>Mode</th><th>Result</th><th>New</th><th>Requested</th><th>Not found</th><th>Errors</th></tr></thead>
-<tbody>{{range .Recent}}<tr><td>{{.StartedAt.Format "01-02 15:04"}}</td><td>{{.Mode}}</td><td>{{if .OK}}<span class="badge badge-done">OK</span>{{else}}<span class="badge badge-error">error</span>{{end}}</td><td>{{.New}}</td><td>{{.Requested}}</td><td>{{.NotFound}}</td><td>{{.Errors}}</td></tr>{{end}}</tbody></table>{{end}}
-{{if .HasLast}}<details><summary>Last run details</summary><pre class="muted">{{.Last.Summary}}{{if .Last.ErrorText}}
+<tbody>{{range .Recent}}<tr><td>{{.StartedAt.Format "01-02 15:04"}}</td><td>{{.Mode}}</td><td>{{if .OK}}<span class="badge badge-ok">OK</span>{{else}}<span class="badge badge-error">error</span>{{end}}</td><td>{{.New}}</td><td>{{.Requested}}</td><td>{{.NotFound}}</td><td>{{.Errors}}</td></tr>{{end}}</tbody></table>{{end}}
+{{if .HasLast}}<details><summary class="muted">Last run details</summary><pre class="muted">{{.Last.Summary}}{{if .Last.ErrorText}}
 {{.Last.ErrorText}}{{end}}</pre></details>{{end}}{{end}}

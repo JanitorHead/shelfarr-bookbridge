@@ -29,7 +29,7 @@ func TestStylesheetHasComponents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{".banner-error", ".btn-secondary", ".badge-done"} {
+	for _, want := range []string{".banner-error", ".btn-secondary", ".badge-ok"} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("style.css missing %s", want)
 		}

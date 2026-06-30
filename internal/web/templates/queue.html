@@ -1,5 +1,14 @@
-{{define "content"}}<h1>Queue</h1>
-<p class="muted">Filter: <a href="/queue">all</a> · <a href="/queue?state=downloading">downloading</a> · <a href="/queue?state=searching">searching</a> · <a href="/queue?state=requested">requested</a> · <a href="/queue?state=done">done</a> · <a href="/queue?state=not_found">not_found</a></p>
-<table><thead><tr><th>Title</th><th>Author</th><th>State</th><th>Lang</th><th>work_id</th></tr></thead><tbody>
-{{range .Rows}}<tr><td>{{.Title}}</td><td>{{.Author}}</td><td>{{.State}}</td><td>{{.Language}}</td><td class="muted">{{.WorkID}}</td></tr>{{else}}<tr><td colspan="5" class="muted">No books.</td></tr>{{end}}
-</tbody></table>{{end}}
+{{define "content"}}<div class="page-head"><h1>Library</h1><span class="muted">{{.Shown}} shown</span></div>
+<form method="get" action="/queue" class="toolbar">
+{{if .State}}<input type="hidden" name="state" value="{{.State}}">{{end}}
+<input type="search" name="q" value="{{.Q}}" placeholder="Search title or author…">
+<button class="btn">Search</button>
+{{if .Q}}<a class="btn btn-secondary" href="/queue{{if .State}}?state={{.State}}{{end}}">Clear</a>{{end}}
+</form>
+<div class="chips">
+<a class="chip {{if not .State}}chip-on{{end}}" href="/queue{{if .Q}}?q={{.Q}}{{end}}">All</a>
+{{range $s := list "downloading" "searching" "requested" "done" "not_found" "failed" "parked"}}<a class="chip chip-{{stateClass $s}} {{if eq $.State $s}}chip-on{{end}}" href="/queue?state={{$s}}{{if $.Q}}&q={{$.Q}}{{end}}">{{stateLabel $s}}{{with index $.Counts $s}} <b>{{.}}</b>{{end}}</a>{{end}}
+</div>
+<div class="booklist">
+{{range .Rows}}{{template "bookrow" .}}{{else}}<p class="muted empty">No books match.</p>{{end}}
+</div>{{end}}

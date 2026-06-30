@@ -249,10 +249,14 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	needsAuth := s.settingValue("GOODREADS_COOKIE") == "" && s.settingValue("GOODREADS_FEED_KEY") == ""
 	started := r.URL.Query().Get("started") != ""
+	downloading, _ := s.st.ListBooks(ctx, "downloading", "", 8)
+	notFound, _ := s.st.ListBooks(ctx, "not_found", "", 8)
 	s.render(w, r, "dashboard", "Dashboard", map[string]any{
 		"Cells": cells, "NeedsAuth": needsAuth, "Started": started,
 		"Running": running, "StartedAt": startedAt,
 		"Last": last, "HasLast": hasLast, "Recent": recent, "NextRun": next,
+		"Downloading": downloading, "NotFound": notFound,
+		"TotalBooks": total(counts),
 	})
 }
 

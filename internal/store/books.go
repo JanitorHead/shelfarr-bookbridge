@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 )
@@ -166,23 +167,38 @@ func (s *Store) IncAttempt(ctx context.Context, source, externalID string) (int,
 }
 
 type BookRow struct {
-	Source, ExternalID, Title, Author, State, WorkID, RequestID, Language string
-	AttemptCount                                                          int
+	Source, ExternalID, Title, Author, State, WorkID, RequestID, Language, CoverURL string
+	AttemptCount                                                                     int
+	Shelves                                                                          []string
 }
 
-func (s *Store) ListBooks(ctx context.Context, state string, limit int) ([]BookRow, error) {
+// ListBooks returns book rows, newest-updated first. state "" = any state; q ""
+// = no text filter (otherwise matches title or author, case-insensitively).
+func (s *Store) ListBooks(ctx context.Context, state, q string, limit int) ([]BookRow, error) {
 	if limit <= 0 {
 		limit = 500
 	}
-	q := `SELECT source,external_id,title,author,state,COALESCE(work_id,''),COALESCE(shelfarr_request_id,''),COALESCE(chosen_language,''),attempt_count FROM books`
+	query := `SELECT b.source,b.external_id,b.title,b.author,b.state,COALESCE(b.work_id,''),
+	  COALESCE(b.shelfarr_request_id,''),COALESCE(b.chosen_language,''),b.attempt_count,COALESCE(b.cover_url,''),
+	  COALESCE((SELECT GROUP_CONCAT(shelf, ',') FROM book_shelves bs WHERE bs.source=b.source AND bs.external_id=b.external_id),'')
+	  FROM books b`
+	var where []string
 	args := []any{}
 	if state != "" {
-		q += ` WHERE state=?`
+		where = append(where, "b.state=?")
 		args = append(args, state)
 	}
-	q += ` ORDER BY updated_at DESC LIMIT ?`
+	if q != "" {
+		where = append(where, "(b.title LIKE ? OR b.author LIKE ?)")
+		like := "%" + q + "%"
+		args = append(args, like, like)
+	}
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += ` ORDER BY b.updated_at DESC LIMIT ?`
 	args = append(args, limit)
-	rows, err := s.db.QueryContext(ctx, q, args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -190,8 +206,12 @@ func (s *Store) ListBooks(ctx context.Context, state string, limit int) ([]BookR
 	var out []BookRow
 	for rows.Next() {
 		var b BookRow
-		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount); err != nil {
+		var shelvesCSV string
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &shelvesCSV); err != nil {
 			return nil, err
+		}
+		if shelvesCSV != "" {
+			b.Shelves = strings.Split(shelvesCSV, ",")
 		}
 		out = append(out, b)
 	}

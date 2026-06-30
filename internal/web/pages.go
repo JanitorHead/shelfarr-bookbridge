@@ -8,8 +8,12 @@ import (
 func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	state := r.URL.Query().Get("state")
-	rows, _ := s.st.ListBooks(ctx, state, 500)
-	s.render(w, r, "queue", "Queue", map[string]any{"Rows": rows, "State": state})
+	q := r.URL.Query().Get("q")
+	rows, _ := s.st.ListBooks(ctx, state, q, 1000)
+	counts, _ := s.st.StateCounts(ctx)
+	s.render(w, r, "queue", "Queue", map[string]any{
+		"Rows": rows, "State": state, "Q": q, "Counts": counts, "Shown": len(rows),
+	})
 }
 
 func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
@@ -29,8 +33,8 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/review", http.StatusSeeOther)
 		return
 	}
-	nf, _ := s.st.ListBooks(ctx, "not_found", 500)
-	parked, _ := s.st.ListBooks(ctx, "parked", 500)
+	nf, _ := s.st.ListBooks(ctx, "not_found", "", 500)
+	parked, _ := s.st.ListBooks(ctx, "parked", "", 500)
 	s.render(w, r, "review", "Review", map[string]any{"Rows": append(nf, parked...)})
 }
 

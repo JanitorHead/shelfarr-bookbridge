@@ -1,6 +1,10 @@
-{{define "content"}}<h1>Review — not found / parked</h1>
-<table><thead><tr><th>Title</th><th>Author</th><th>State</th><th>Att.</th><th>Actions</th></tr></thead><tbody>
-{{range .Rows}}<tr><td>{{.Title}}</td><td>{{.Author}}</td><td>{{.State}}</td><td>{{.AttemptCount}}</td>
-<td><form method="post" action="/review" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="source" value="{{.Source}}"><input type="hidden" name="external_id" value="{{.ExternalID}}"><button name="action" value="retry">Retry</button> <button name="action" value="ignore" class="btn-secondary">Ignore</button></form></td></tr>
-{{else}}<tr><td colspan="5" class="muted">Nothing to review 🎉</td></tr>{{end}}
-</tbody></table>{{end}}
+{{define "content"}}<div class="page-head"><h1>Review</h1><span class="muted">not found / parked — retry or ignore</span></div>
+<div class="booklist">
+{{range .Rows}}<div class="book accent-{{stateClass .State}}">
+<div class="cover">{{if .CoverURL}}<img src="{{.CoverURL}}" alt="" loading="lazy">{{else}}<span class="cover-ph">{{initials .Title}}</span>{{end}}</div>
+<div class="bk-main"><div class="bk-title">{{.Title}}</div><div class="bk-sub">{{.Author}} · {{.AttemptCount}} attempt(s){{range .Shelves}} <span class="tag">{{.}}</span>{{end}}</div></div>
+<div class="bk-meta"><span class="badge badge-{{stateClass .State}}">{{stateLabel .State}}</span>
+<form method="post" action="/review" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="source" value="{{.Source}}"><input type="hidden" name="external_id" value="{{.ExternalID}}"><button name="action" value="retry" class="btn">Retry</button> <button name="action" value="ignore" class="btn btn-secondary">Ignore</button></form>
+</div></div>
+{{else}}<p class="muted empty">Nothing to review 🎉</p>{{end}}
+</div>{{end}}

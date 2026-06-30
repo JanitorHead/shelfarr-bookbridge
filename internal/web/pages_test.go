@@ -32,7 +32,7 @@ func TestReviewIgnoreAction(t *testing.T) {
 	req.RemoteAddr = "127.0.0.1:1"
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
-	rows, _ := s.st.ListBooks(ctx, "ignored", 10)
+	rows, _ := s.st.ListBooks(ctx, "ignored", "", 10)
 	if len(rows) != 1 {
 		t.Fatalf("ignore action did not apply: %+v", rows)
 	}

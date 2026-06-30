@@ -15,22 +15,25 @@ func TestListBooksAndActions(t *testing.T) {
 		{Source: "goodreads", ExternalID: "2", Title: "B", Author: "Y"},
 	})
 	s.SetState(ctx, sources.Book{Source: "goodreads", ExternalID: "2"}, "not_found")
-	if rows, _ := s.ListBooks(ctx, "not_found", 50); len(rows) != 1 || rows[0].ExternalID != "2" {
+	if rows, _ := s.ListBooks(ctx, "not_found", "", 50); len(rows) != 1 || rows[0].ExternalID != "2" {
 		t.Fatalf("ListBooks filter: %+v", rows)
 	}
-	if all, _ := s.ListBooks(ctx, "", 50); len(all) != 2 {
+	if all, _ := s.ListBooks(ctx, "", "", 50); len(all) != 2 {
 		t.Fatalf("ListBooks all: %d", len(all))
+	}
+	if got, _ := s.ListBooks(ctx, "", "B", 50); len(got) != 1 || got[0].ExternalID != "2" {
+		t.Fatalf("ListBooks search q=B: %+v", got)
 	}
 	if err := s.IgnoreBook(ctx, "goodreads", "1"); err != nil {
 		t.Fatal(err)
 	}
-	if rows, _ := s.ListBooks(ctx, "ignored", 50); len(rows) != 1 {
+	if rows, _ := s.ListBooks(ctx, "ignored", "", 50); len(rows) != 1 {
 		t.Fatal("ignore failed")
 	}
 	if err := s.RetryBook(ctx, "goodreads", "2"); err != nil {
 		t.Fatal(err)
 	}
-	if rows, _ := s.ListBooks(ctx, "new", 50); len(rows) != 1 || rows[0].ExternalID != "2" {
+	if rows, _ := s.ListBooks(ctx, "new", "", 50); len(rows) != 1 || rows[0].ExternalID != "2" {
 		t.Fatalf("retry should reset to new: %+v", rows)
 	}
 }

@@ -42,7 +42,13 @@ type Server struct {
 }
 
 func New(st *store.Store, run Runner) *Server {
-	t := template.Must(template.ParseFS(tmplFS, "templates/*.html"))
+	funcs := template.FuncMap{
+		"stateClass": stateClass,
+		"stateLabel": stateLabel,
+		"initials":   initials,
+		"list":       list,
+	}
+	t := template.Must(template.New("").Funcs(funcs).ParseFS(tmplFS, "templates/*.html"))
 	return &Server{st: st, run: run, tmpl: t, getenv: os.Getenv, sess: map[string]*session{}}
 }
 
@@ -111,7 +117,9 @@ func securityHeaders(h http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		// Strict by default; allow external book-cover images (Goodreads/Shelfarr/
+		// OpenLibrary serve them over https) and data: placeholders. No inline JS/CSS.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' https: data:")
 		h.ServeHTTP(w, r)
 	})
 }
@@ -136,7 +144,16 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 // render executes the base template with a page-specific "content" block.
 func (s *Server) render(w http.ResponseWriter, r *http.Request, page, title string, data map[string]any) {
 	se := s.session(r)
-	base := map[string]any{"Title": title, "Authed": se != nil, "CSRF": "", "Flash": ""}
+	cfg := s.cfg()
+	// The nav must show whenever the page is actually usable — including the *arr
+	// "local bypass" and "auth disabled" modes, where there is no session. The old
+	// `.Authed = se != nil` hid the entire nav for LAN users (AUTH_REQUIRED=local).
+	canUse := se != nil || cfg.AuthMethod == "none" ||
+		(cfg.AuthRequired == "local" && auth.IsLocalAddr(r.RemoteAddr))
+	base := map[string]any{
+		"Title": title, "Authed": canUse, "HasSession": se != nil,
+		"Active": activePage(r.URL.Path), "CSRF": "", "Flash": "",
+	}
 	if se != nil {
 		base["CSRF"] = se.csrf
 	}

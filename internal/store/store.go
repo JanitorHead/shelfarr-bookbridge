@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 6
+const schemaVersion = 7
 
 type Store struct{ db *sql.DB }
 
@@ -90,6 +90,9 @@ ALTER TABLE run_state ADD COLUMN current TEXT NOT NULL DEFAULT '';
 ALTER TABLE run_state ADD COLUMN p_requested INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE run_state ADD COLUMN p_not_found INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE run_state ADD COLUMN p_failed INTEGER NOT NULL DEFAULT 0;`,
+		// v7: discovered-shelf metadata for the toggle UI
+		`ALTER TABLE shelf_config ADD COLUMN name TEXT NOT NULL DEFAULT '';
+ALTER TABLE shelf_config ADD COLUMN book_count INTEGER NOT NULL DEFAULT 0;`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

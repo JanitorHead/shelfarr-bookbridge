@@ -8,15 +8,20 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 )
 
-var ErrCookieExpired = errors.New("goodreads session cookie expired or invalid — re-grab it from your browser DevTools")
+var ErrCookieExpired = errors.New("goodreads rejected the session cookie (expired or incomplete) — copy the FULL Cookie header from a logged-in goodreads.com tab; it must include _session_id2 AND the Amazon at-main / x-main / session-token cookies")
 
 const maxHTMLPages = 50 // safety bound (50*100 = 5000 books)
+
+// browserUA — Goodreads serves a login wall / 401 to non-browser User-Agents even
+// with a valid cookie, so identify as a real browser.
+const browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 type HTMLSource struct {
 	userID string
@@ -51,14 +56,17 @@ func (s *HTMLSource) Fetch(ctx context.Context, shelves []string) ([]sources.Boo
 			if err != nil {
 				return nil, err
 			}
-			req.Header.Set("User-Agent", "shelfarr-bookbridge/0.1 (+self-hosted)")
-			req.Header.Set("Cookie", s.cookie.Reveal())
+			req.Header.Set("User-Agent", browserUA)
+			req.Header.Set("Cookie", strings.TrimSpace(s.cookie.Reveal()))
 			resp, err := s.hc.Do(req)
 			if err != nil {
 				return nil, fmt.Errorf("goodreads html fetch %q p%d: %w", shelf, page, err)
 			}
 			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
+			if resp.StatusCode == 401 || resp.StatusCode == 403 {
+				return nil, ErrCookieExpired
+			}
 			if resp.StatusCode != 200 {
 				return nil, fmt.Errorf("goodreads html fetch %q p%d: HTTP %d", shelf, page, resp.StatusCode)
 			}

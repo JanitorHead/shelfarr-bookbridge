@@ -50,6 +50,20 @@ func activePage(path string) string {
 // list returns its arguments as a slice (templates can't build slice literals).
 func list(xs ...string) []string { return xs }
 
+// optLabel humanizes a <select> option value; unknown values pass through.
+func optLabel(v string) string {
+	switch v {
+	case "":
+		return "auto (use the cookie if one is set)"
+	case "private_cookie":
+		return "private — session cookie (private / >100-book shelves)"
+	case "public_rss":
+		return "public — RSS feed (public shelves, max 100)"
+	default:
+		return v
+	}
+}
+
 // total sums all state counts (the size of the tracked library).
 func total(m map[string]int) int {
 	n := 0

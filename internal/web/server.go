@@ -14,6 +14,7 @@ import (
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/auth"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/engine"
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/store"
 )
 
@@ -33,12 +34,19 @@ type session struct {
 }
 
 type Server struct {
-	st     *store.Store
-	run    Runner
-	tmpl   *template.Template
-	getenv func(string) string
-	mu     sync.Mutex
-	sess   map[string]*session
+	st       *store.Store
+	run      Runner
+	discover func(ctx context.Context) ([]sources.Shelf, error)
+	tmpl     *template.Template
+	getenv   func(string) string
+	mu       sync.Mutex
+	sess     map[string]*session
+}
+
+// SetDiscoverer wires the shelf-discovery function (built from effective config
+// in main) so the Shelves page can list the source's shelves as toggles.
+func (s *Server) SetDiscoverer(fn func(ctx context.Context) ([]sources.Shelf, error)) {
+	s.discover = fn
 }
 
 func New(st *store.Store, run Runner) *Server {
@@ -47,6 +55,7 @@ func New(st *store.Store, run Runner) *Server {
 		"stateLabel": stateLabel,
 		"initials":   initials,
 		"list":       list,
+		"optLabel":   optLabel,
 	}
 	t := template.Must(template.New("").Funcs(funcs).ParseFS(tmplFS, "templates/*.html"))
 	return &Server{st: st, run: run, tmpl: t, getenv: os.Getenv, sess: map[string]*session{}}
@@ -108,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/queue", s.guard(s.handleQueue))
 	mux.HandleFunc("/review", s.guard(s.handleReview))
 	mux.HandleFunc("/shelves", s.guard(s.handleShelves))
+	mux.HandleFunc("/shelves/refresh", s.guard(s.handleShelvesRefresh))
 	mux.HandleFunc("/", s.guard(s.handleDashboard))
 	return securityHeaders(mux)
 }

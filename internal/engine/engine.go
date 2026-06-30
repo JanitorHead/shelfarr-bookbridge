@@ -76,7 +76,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 	}
 	defer e.st.ReleaseRun(ctx)
 	var rep Report
-	shelves, err := e.st.EnabledShelves(ctx, e.cfg.Shelves)
+	shelves, err := e.st.ShelvesToSync(ctx, e.cfg.Shelves)
 	if err != nil {
 		return rep, err
 	}

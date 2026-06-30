@@ -24,7 +24,9 @@ button:disabled{opacity:.55;cursor:default}
 .btn-secondary{background:#3a424b}
 .inline{display:inline;margin:0}
 label{display:block;margin:.7rem 0 .2rem;font-size:.88rem;color:#b6bfc8}
-input,select{width:100%;max-width:520px;padding:.5rem;background:var(--panel2);color:#eee;border:1px solid #3a424b;border-radius:6px;font-size:.92rem}
+input,select,textarea{width:100%;max-width:520px;padding:.5rem;background:var(--panel2);color:#eee;border:1px solid #3a424b;border-radius:6px;font-size:.92rem;font-family:inherit}
+textarea{resize:vertical;min-height:3.4rem}
+.hint{margin:.3rem 0 .2rem}.hint summary{cursor:pointer}.hint ol{margin:.4rem 0 .4rem 1.1rem;line-height:1.5}.hint code{background:#2a2f34;padding:0 .25rem;border-radius:3px}
 input[type=checkbox],input[type=radio]{width:auto}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -78,6 +80,19 @@ input[type=checkbox],input[type=radio]{width:auto}
 .progress progress::-webkit-progress-value{background:var(--active)}
 .progress progress::-moz-progress-bar{background:var(--active)}
 #progress-text{margin-top:.35rem}
+
+/* shelves toggles */
+.shelf-list{display:flex;flex-direction:column;gap:.5rem;margin:.6rem 0 1rem}
+.shelf-row{display:flex;align-items:center;gap:.8rem;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:.55rem .8rem}
+.shelf-main{flex:1;min-width:0}.shelf-name{font-weight:600}
+.shelf-row select{width:auto;max-width:160px;margin:0;padding:.32rem .45rem;font-size:.82rem}
+.switch{position:relative;display:inline-block;width:42px;height:24px;flex:0 0 auto}
+.switch input{opacity:0;width:0;height:0;position:absolute}
+.switch .slider{position:absolute;inset:0;background:#3a424b;border-radius:999px;transition:.2s;cursor:pointer}
+.switch .slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#cfd6dd;border-radius:50%;transition:.2s}
+.switch input:checked + .slider{background:var(--accent)}
+.switch input:checked + .slider::before{transform:translateX(18px)}
+.switch input:focus-visible + .slider{outline:2px solid var(--accent);outline-offset:2px}
 
 /* tables */
 table,.table{width:100%;border-collapse:collapse;font-size:.88rem}

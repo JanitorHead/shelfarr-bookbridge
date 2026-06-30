@@ -12,9 +12,9 @@ func TestShelvesSave(t *testing.T) {
 	ctx := reqCtx()
 	s.st.SetSetting(ctx, "SHELVES", "to-read,sci-fi")
 	form := url.Values{
-		"shelf":          {"sci-fi"},
-		"enabled_sci-fi": {""}, // unchecked -> disabled
-		"format_sci-fi":  {"audiobook"},
+		"shelves":         {"to-read,sci-fi"}, // all rows saved in one POST
+		"enabled_to-read": {"1"},              // to-read on
+		"format_sci-fi":   {"audiobook"},      // sci-fi unchecked -> disabled
 	}
 	req := httptest.NewRequest("POST", "/shelves", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

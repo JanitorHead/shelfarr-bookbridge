@@ -1,11 +1,18 @@
-{{define "content"}}<h1>Shelves</h1>
-<p class="muted">Configured shelves come from <a href="/settings">Settings → Shelves</a>. Per-shelf format overrides the global format; blank = use global.</p>
-{{range .Shelves}}
-<form method="post" action="/shelves" class="card">
-<input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="shelf" value="{{.Shelf}}">
-<strong>{{.Shelf}}</strong>
-<label><input type="checkbox" name="enabled_{{.Shelf}}" value="1" {{if .Enabled}}checked{{end}}> Enabled</label>
-<label>Format override (blank/ebook/audiobook)</label><input name="format_{{.Shelf}}" value="{{.Format}}">
-<label>Language override (blank/es/en)</label><input name="language_{{.Shelf}}" value="{{.Language}}">
-<button type="submit">Save shelf</button></form>
-{{else}}<p class="muted">No shelves configured.</p>{{end}}{{end}}
+{{define "content"}}<div class="page-head"><h1>Shelves</h1><span class="muted">source: {{.Source}}</span></div>
+{{if .Saved}}<div class="banner banner-ok">Shelves saved.</div>{{end}}
+{{if .Refreshed}}<div class="banner banner-ok">Found {{.Refreshed}} shelves from {{.Source}}. Toggle the ones you want and Save.</div>{{end}}
+{{if .Err}}<div class="banner banner-error">Couldn’t list shelves: {{.Err}}</div>{{end}}
+<form method="post" action="/shelves/refresh" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn">↻ Refresh shelves from {{.Source}}</button></form>
+<p class="muted">Toggle the shelves to sync. Newly discovered shelves start off. Per-shelf format/language override the global setting.</p>
+<form method="post" action="/shelves">
+<input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="shelves" value="{{.Slugs}}">
+<div class="shelf-list">
+{{range .Shelves}}<div class="shelf-row">
+<label class="switch"><input type="checkbox" name="enabled_{{.Shelf}}" value="1" {{if .Enabled}}checked{{end}}><span class="slider"></span></label>
+<div class="shelf-main"><div class="shelf-name">{{.Name}}{{if ne .Name .Shelf}} <span class="muted small">({{.Shelf}})</span>{{end}}</div>{{if .Count}}<div class="muted small">{{.Count}} books</div>{{end}}</div>
+<select name="format_{{.Shelf}}"><option value="" {{if eq .Format ""}}selected{{end}}>format: global</option><option value="ebook" {{if eq .Format "ebook"}}selected{{end}}>ebook</option><option value="audiobook" {{if eq .Format "audiobook"}}selected{{end}}>audiobook</option></select>
+<select name="language_{{.Shelf}}"><option value="" {{if eq .Language ""}}selected{{end}}>lang: global</option><option value="es" {{if eq .Language "es"}}selected{{end}}>es</option><option value="en" {{if eq .Language "en"}}selected{{end}}>en</option></select>
+</div>{{else}}<p class="muted empty">No shelves yet — connect {{.Source}} in <a href="/settings">Settings</a>, then hit “Refresh shelves”.</p>{{end}}
+</div>
+{{if .Shelves}}<button type="submit" class="btn">Save shelves</button>{{end}}
+</form>{{end}}

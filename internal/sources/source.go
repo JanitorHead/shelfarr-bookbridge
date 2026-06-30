@@ -23,3 +23,17 @@ type Book struct {
 type Source interface {
 	Fetch(ctx context.Context, shelves []string) ([]Book, error)
 }
+
+// Shelf is a user-defined collection discovered from a source (a Goodreads
+// shelf or a Hardcover list) that the user can toggle on/off for syncing.
+type Shelf struct {
+	Slug  string // stable identifier used by Fetch (e.g. "to-read")
+	Name  string // human label
+	Count int    // book count if known, else 0
+}
+
+// ShelfLister is implemented by sources that can enumerate the user's shelves
+// so the GUI can present them as toggles instead of typed slugs.
+type ShelfLister interface {
+	ListShelves(ctx context.Context) ([]Shelf, error)
+}

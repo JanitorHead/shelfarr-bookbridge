@@ -9,10 +9,13 @@ import (
 type Config struct {
 	ShelfarrURL         string
 	ShelfarrToken       SecretString
+	Source              string // "goodreads" (default) | "hardcover"
 	GoodreadsUserID     string
 	GoodreadsFeedKey    SecretString
 	GoodreadsCookie     SecretString
 	GoodreadsMode       string
+	HardcoverToken      SecretString
+	HardcoverUsername   string
 	Shelves             []string
 	Format              string
 	SimilarityThreshold float64
@@ -36,10 +39,13 @@ func loadFrom(get func(string) string) (Config, error) {
 	c := Config{
 		ShelfarrURL:         get("SHELFARR_URL"),
 		ShelfarrToken:       SecretString(get("SHELFARR_TOKEN")),
+		Source:              orDefault(get("SOURCE"), "goodreads"),
 		GoodreadsUserID:     get("GOODREADS_USER_ID"),
 		GoodreadsFeedKey:    SecretString(get("GOODREADS_FEED_KEY")),
 		GoodreadsCookie:     SecretString(get("GOODREADS_COOKIE")),
 		GoodreadsMode:       get("GOODREADS_MODE"),
+		HardcoverToken:      SecretString(get("HARDCOVER_TOKEN")),
+		HardcoverUsername:   get("HARDCOVER_USERNAME"),
 		Shelves:             splitCSV(get("SHELVES")),
 		Format:              orDefault(get("FORMAT"), "ebook"),
 		SimilarityThreshold: 0.82,

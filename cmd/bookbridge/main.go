@@ -16,7 +16,9 @@ import (
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/langdetect"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/scheduler"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/shelfarr"
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources/goodreads"
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources/hardcover"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/store"
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/web"
 )
@@ -73,13 +75,42 @@ func engineFor(cfg config.Config, st *store.Store, getenv func(string) string) (
 	if err := config.CheckTransport(cfg.ShelfarrURL, cfg.ShelfarrInsecure); err != nil {
 		return nil, err
 	}
-	src := goodreads.NewSource(cfg.GoodreadsMode, cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
+	src := sourceFor(cfg, getenv)
 	sh := shelfarr.New(cfg.ShelfarrURL, cfg.ShelfarrToken, &http.Client{Timeout: 20 * time.Second})
 	e := engine.New(src, st, sh, cfg)
 	if cfg.LangInference {
 		e.SetDetector(langdetect.New())
 	}
 	return e, nil
+}
+
+// newWebServer builds the GUI server wired with a runner and a shelf discoverer
+// (the discoverer is rebuilt from effective config per call so it always uses the
+// latest cookie/mode the user saved in Settings).
+func newWebServer(st *store.Store, getenv func(string) string) *web.Server {
+	srv := web.New(st, func(dryRun bool) (engine.Report, error) { return runOnce(st, getenv, dryRun) })
+	srv.SetDiscoverer(func(ctx context.Context) ([]sources.Shelf, error) {
+		cfg, err := effectiveConfig(st, getenv)
+		if err != nil {
+			return nil, err
+		}
+		src := sourceFor(cfg, getenv)
+		lister, ok := src.(sources.ShelfLister)
+		if !ok {
+			return nil, fmt.Errorf("listing shelves needs the Goodreads session cookie — set \"Goodreads source mode\" to private and paste your cookie in Settings")
+		}
+		return lister.ListShelves(ctx)
+	})
+	return srv
+}
+
+// sourceFor builds the ingest source from effective config (explicit selection by
+// cfg.Source; Goodreads sub-mode by cfg.GoodreadsMode).
+func sourceFor(cfg config.Config, getenv func(string) string) sources.Source {
+	if cfg.Source == "hardcover" {
+		return hardcover.NewSource(cfg.HardcoverToken, getenv("HARDCOVER_BASE"), nil)
+	}
+	return goodreads.NewSource(cfg.GoodreadsMode, cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
 }
 
 // runOnce builds the engine from effective config and runs one cycle. It returns
@@ -152,7 +183,7 @@ func runSync(args []string, getenv func(string) string, out io.Writer) int {
 
 	if *baseline {
 		// baseline only reads Goodreads + marks the store; it does not touch Shelfarr.
-		src := goodreads.NewSource(cfg.GoodreadsMode, cfg.GoodreadsUserID, cfg.GoodreadsFeedKey, cfg.GoodreadsCookie, getenv("GOODREADS_BASE"), nil)
+		src := sourceFor(cfg, getenv)
 		books, err := src.Fetch(ctx, cfg.Shelves)
 		if err != nil {
 			fmt.Fprintln(out, "fetch error:", err)
@@ -222,7 +253,7 @@ func runDaemon(args []string, getenv func(string) string, out io.Writer) int {
 	// Serve the GUI alongside the scheduler — ALWAYS, even before Shelfarr is
 	// configured, so it can be set up in the GUI.
 	go func() {
-		srv := web.New(st, func(dryRun bool) (engine.Report, error) { return runOnce(st, getenv, dryRun) })
+		srv := newWebServer(st, getenv)
 		addr := net.JoinHostPort(cfg.GUIBind, cfg.GUIPort)
 		fmt.Fprintf(out, "BookBridge GUI on http://%s\n", addr)
 		if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
@@ -253,7 +284,7 @@ func runWeb(args []string, getenv func(string) string, out io.Writer) int {
 	}
 	defer st.Close()
 	bootstrapAdmin(st, getenv)
-	srv := web.New(st, func(dryRun bool) (engine.Report, error) { return runOnce(st, getenv, dryRun) })
+	srv := newWebServer(st, getenv)
 	cfg, _ := effectiveConfig(st, getenv)
 	addr := net.JoinHostPort(cfg.GUIBind, cfg.GUIPort)
 	fmt.Fprintf(out, "BookBridge GUI on http://%s\n", addr)

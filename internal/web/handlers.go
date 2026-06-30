@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/auth"
@@ -33,10 +32,11 @@ var settingFields = []struct {
 	Options          []string
 	OnValue, OffValue string
 }{
-	{Key: "GOODREADS_MODE", Label: "Goodreads source mode", Kind: "select", Options: []string{"public_rss", "private_cookie"}},
+	{Key: "SOURCE", Label: "Book source", Kind: "select", Options: []string{"goodreads", "hardcover"}},
 	{Key: "SHELFARR_URL", Label: "Shelfarr URL", Kind: "text"},
+	{Key: "GOODREADS_MODE", Label: "Goodreads source mode", Kind: "select", Options: []string{"", "private_cookie", "public_rss"}},
 	{Key: "GOODREADS_USER_ID", Label: "Goodreads user id", Kind: "text"},
-	{Key: "SHELVES", Label: "Shelves (comma-separated)", Kind: "text"},
+	{Key: "HARDCOVER_USERNAME", Label: "Hardcover username (optional)", Kind: "text"},
 	{Key: "FORMAT", Label: "Format (ebook/audiobook)", Kind: "select", Options: []string{"ebook", "audiobook"}},
 	{Key: "MAX_REQUESTS_PER_RUN", Label: "Max requests per run", Kind: "number"},
 	{Key: "SIMILARITY_THRESHOLD", Label: "Similarity threshold (0-1)", Kind: "number"},
@@ -52,6 +52,7 @@ var secretFields = []struct{ Key, Label string }{
 	{"SHELFARR_TOKEN", "Shelfarr API token"},
 	{"GOODREADS_COOKIE", "Goodreads session cookie"},
 	{"GOODREADS_FEED_KEY", "Goodreads RSS feed key"},
+	{"HARDCOVER_TOKEN", "Hardcover API token"},
 }
 
 // scheduleOption is one entry in the visual schedule preset selector.
@@ -108,6 +109,15 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				}
 				continue
 			}
+			if f.Kind == "select" {
+				// A select always submits a deliberate value (incl. the empty
+				// "auto" choice), so write it verbatim — otherwise picking "auto"
+				// could never clear a previously-saved mode.
+				if _, ok := r.PostForm[f.Key]; ok {
+					s.st.SetSetting(ctx, f.Key, r.PostFormValue(f.Key))
+				}
+				continue
+			}
 			if v := r.PostFormValue(f.Key); v != "" {
 				s.st.SetSetting(ctx, f.Key, v)
 			}
@@ -148,8 +158,8 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched sc
 	}
 	var fields []field
 	cur := map[string]string{
-		"GOODREADS_MODE": cfg.GoodreadsMode, "SHELFARR_URL": cfg.ShelfarrURL,
-		"GOODREADS_USER_ID": cfg.GoodreadsUserID, "SHELVES": strings.Join(cfg.Shelves, ","),
+		"SOURCE": cfg.Source, "GOODREADS_MODE": cfg.GoodreadsMode, "SHELFARR_URL": cfg.ShelfarrURL,
+		"GOODREADS_USER_ID": cfg.GoodreadsUserID, "HARDCOVER_USERNAME": cfg.HardcoverUsername,
 		"FORMAT": cfg.Format, "MAX_REQUESTS_PER_RUN": itoa(cfg.MaxRequestsPerRun),
 		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),

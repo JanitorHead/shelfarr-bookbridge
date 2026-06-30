@@ -55,6 +55,29 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	counts, _ := s.st.StateCounts(ctx)
+	order := []string{"new", "requesting", "requested", "searching", "downloading", "done", "not_found", "failed", "parked", "cancelled", "baseline", "ignored"}
+	type cell struct {
+		Name string
+		N    int
+	}
+	var cells []cell
+	for _, k := range order {
+		if n, ok := counts[k]; ok {
+			cells = append(cells, cell{k, n})
+		}
+	}
+	lastRun, _, _ := s.st.GetSetting(ctx, "LAST_RUN")
+	cookie, _, _ := s.st.GetSetting(ctx, "GOODREADS_COOKIE")
+	feed, _, _ := s.st.GetSetting(ctx, "GOODREADS_FEED_KEY")
+	s.render(w, r, "dashboard", "Dashboard", map[string]any{
+		"Cells": cells, "LastRun": lastRun,
+		"NeedsAuth": cookie == "" && feed == "",
+	})
+}
+
 // requireCSRF returns false (and writes 403) if the POST lacks a valid token.
 func (s *Server) requireCSRF(w http.ResponseWriter, r *http.Request) bool {
 	se := s.session(r)

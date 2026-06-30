@@ -21,6 +21,10 @@ type Config struct {
 	LangInference       bool
 	ShelfarrInsecure    bool
 	Schedule            string
+	GUIPort             string
+	GUIBind             string
+	AuthMethod          string
+	AuthRequired        string
 }
 
 func Load() (Config, error) { return loadFrom(os.Getenv) }
@@ -43,6 +47,10 @@ func loadFrom(get func(string) string) (Config, error) {
 		LangInference:       get("LANG_INFERENCE") != "off",
 		ShelfarrInsecure:    get("SHELFARR_INSECURE") == "true",
 		Schedule:            orDefault(get("SCHEDULE"), "0 * * * *"),
+		GUIPort:             orDefault(get("GUI_PORT"), "7373"),
+		GUIBind:             orDefault(get("GUI_BIND"), "0.0.0.0"),
+		AuthMethod:          orDefault(get("AUTH_METHOD"), "forms"),
+		AuthRequired:        orDefault(get("AUTH_REQUIRED"), "local"),
 	}
 	if v := get("SIMILARITY_THRESHOLD"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
@@ -79,4 +87,16 @@ func orDefault(v, d string) string {
 		return d
 	}
 	return v
+}
+
+// LoadEffective overlays stored settings (keyed by env-var name) over the
+// environment, then parses as usual — so GUI-edited settings win over env.
+func LoadEffective(getenv func(string) string, settings map[string]string) (Config, error) {
+	merged := func(k string) string {
+		if v, ok := settings[k]; ok && v != "" {
+			return v
+		}
+		return getenv(k)
+	}
+	return loadFrom(merged)
 }

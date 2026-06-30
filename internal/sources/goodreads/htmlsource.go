@@ -42,6 +42,10 @@ func NewHTMLSource(userID string, cookie config.SecretString, base string, hc *h
 
 func (s *HTMLSource) Fetch(ctx context.Context, shelves []string) ([]sources.Book, error) {
 	var all []sources.Book
+	// Reading progress comes from the status-updates feed (the shelf table has
+	// none); fetch it once and stamp it onto matching books. Best-effort — a
+	// failure here never blocks the shelf fetch.
+	progress, _ := s.fetchProgress(ctx)
 	for _, shelf := range shelves {
 		seen := map[string]struct{}{}
 		for page := 1; page <= maxHTMLPages; page++ {
@@ -84,6 +88,10 @@ func (s *HTMLSource) Fetch(ctx context.Context, shelves []string) ([]sources.Boo
 				if _, dup := seen[b.ExternalID]; dup {
 					continue
 				}
+				if p, ok := progress[b.ExternalID]; ok {
+					b.ProgressPct = p.Pct
+					b.ProgressLabel = p.Label
+				}
 				seen[b.ExternalID] = struct{}{}
 				all = append(all, b)
 			}
@@ -94,3 +102,26 @@ func (s *HTMLSource) Fetch(ctx context.Context, shelves []string) ([]sources.Boo
 }
 
 func jitterDelay() time.Duration { return 1500 * time.Millisecond }
+
+// fetchProgress reads the user's reading-progress status updates (current page /
+// percent per book) from /user_status/list. Best-effort: returns an empty map on
+// any error so it never blocks the shelf fetch.
+func (s *HTMLSource) fetchProgress(ctx context.Context) (map[string]readingProgress, error) {
+	u := fmt.Sprintf("%s/user_status/list/%s", s.base, url.PathEscape(s.userID))
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", browserUA)
+	req.Header.Set("Cookie", strings.TrimSpace(s.cookie.Reveal()))
+	resp, err := s.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("goodreads status updates: HTTP %d", resp.StatusCode)
+	}
+	return parseStatusUpdates(body), nil
+}

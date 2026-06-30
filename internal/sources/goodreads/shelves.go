@@ -67,8 +67,11 @@ func parseShelves(data []byte) ([]sources.Shelf, bool, error) {
 }
 
 // ListShelves enumerates the user's Goodreads shelves (requires the cookie).
+// NOTE: do NOT use print=true here — the print view is a bare table without the
+// shelf sidebar, so only the current shelf shows up. The normal My Books page
+// (per_page kept tiny) renders the full shelf list in its sidebar.
 func (s *HTMLSource) ListShelves(ctx context.Context) ([]sources.Shelf, error) {
-	q := url.Values{"print": {"true"}, "per_page": {"1"}}
+	q := url.Values{"per_page": {"1"}}
 	u := fmt.Sprintf("%s/review/list/%s?%s", s.base, url.PathEscape(s.userID), q.Encode())
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {

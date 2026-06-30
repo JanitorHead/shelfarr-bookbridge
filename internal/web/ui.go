@@ -1,6 +1,10 @@
 package web
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/store"
+)
 
 // stateClass maps a book/run state to a semantic color token used by the CSS
 // (badge-<token> and accent-<token>). Keep in sync with style.css.
@@ -75,6 +79,60 @@ func dateOnly(s string) string {
 	}
 	return s
 }
+
+// ownership collapses a book's CWA-ownership flag and download state into one of
+// five Library indicators: owned (in Calibre), downloading, requested, notfound,
+// or missing (not owned and not in any download pipeline — rendered greyed out).
+func ownership(b store.BookRow) string {
+	if b.OwnedInCWA {
+		return "owned"
+	}
+	switch b.State {
+	case "downloading":
+		return "downloading"
+	case "requesting", "requested", "searching", "processing", "new":
+		return "requested"
+	case "not_found":
+		return "notfound"
+	default: // catalog, baseline, ignored, failed, parked, cancelled, done-but-unmatched
+		return "missing"
+	}
+}
+
+// ownLabel humanizes an ownership indicator key for display.
+func ownLabel(key string) string {
+	switch key {
+	case "owned":
+		return "Owned"
+	case "downloading":
+		return "Downloading"
+	case "requested":
+		return "Requested"
+	case "notfound":
+		return "Not found"
+	default:
+		return "Not owned"
+	}
+}
+
+// readingLabel humanizes a reading_status value for display.
+func readingLabel(status string) string {
+	switch status {
+	case "to_read":
+		return "To read"
+	case "reading":
+		return "Reading"
+	case "read":
+		return "Read"
+	case "dnf":
+		return "Did not finish"
+	default:
+		return status
+	}
+}
+
+// topicTags returns a book's non-status (topic) shelves for tag display/filtering.
+func topicTags(shelves []string) []string { return store.TopicTags(shelves) }
 
 // stars renders an integer rating (0–5) as filled stars.
 func stars(n int) string {

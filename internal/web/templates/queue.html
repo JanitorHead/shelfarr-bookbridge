@@ -1,13 +1,23 @@
 {{define "content"}}<div class="page-head"><h1>Library</h1><span class="muted">{{.Shown}} shown</span></div>
 <form method="get" action="/queue" class="toolbar">
 {{if .State}}<input type="hidden" name="state" value="{{.State}}">{{end}}
+{{if .Status}}<input type="hidden" name="status" value="{{.Status}}">{{end}}
+{{if .Tag}}<input type="hidden" name="tag" value="{{.Tag}}">{{end}}
+{{if .Owned}}<input type="hidden" name="owned" value="{{.Owned}}">{{end}}
 <input type="search" name="q" value="{{.Q}}" placeholder="Search title or author…">
 <button class="btn">Search</button>
-{{if .Q}}<a class="btn btn-secondary" href="/queue{{if .State}}?state={{.State}}{{end}}">Clear</a>{{end}}
+{{if .State}}<a class="chip chip-on" href="/queue">pipeline: {{stateLabel .State}} ✕</a>{{end}}
 </form>
-<div class="chips">
-<a class="chip {{if not .State}}chip-on{{end}}" href="/queue{{if .Q}}?q={{.Q}}{{end}}">All</a>
-{{range $s := list "downloading" "searching" "requested" "done" "not_found" "failed" "parked"}}<a class="chip chip-{{stateClass $s}} {{if eq $.State $s}}chip-on{{end}}" href="/queue?state={{$s}}{{if $.Q}}&q={{$.Q}}{{end}}">{{stateLabel $s}}{{with index $.Counts $s}} <b>{{.}}</b>{{end}}</a>{{end}}
+<div class="filters">
+<div class="filter-group"><span class="filter-lbl">Status</span><div class="chips">
+{{range .StatusChips}}<a class="chip {{if .On}}chip-on{{end}}" href="{{.Href}}">{{.Label}}{{if .N}} <b>{{.N}}</b>{{end}}</a>{{end}}
+</div></div>
+<div class="filter-group"><span class="filter-lbl">Ownership</span><div class="chips">
+{{range .OwnChips}}<a class="chip {{if .On}}chip-on{{end}}" href="{{.Href}}">{{.Label}}{{if .N}} <b>{{.N}}</b>{{end}}</a>{{end}}
+</div></div>
+{{if .HasTags}}<div class="filter-group"><span class="filter-lbl">Tags</span><div class="chips">
+{{range .TagChips}}<a class="chip {{if .On}}chip-on{{end}}" href="{{.Href}}">{{.Label}} <b>{{.N}}</b></a>{{end}}
+</div></div>{{end}}
 </div>
 <div class="booklist">
 {{range .Rows}}{{template "bookrow" .}}{{else}}<p class="muted empty">No books match.</p>{{end}}

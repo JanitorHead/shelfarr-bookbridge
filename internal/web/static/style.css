@@ -58,6 +58,12 @@ input[type=checkbox],input[type=radio]{width:auto}
 .chip-on{background:#2c333a;color:#fff;border-color:var(--accent)}
 .chip-active.chip-on{border-color:var(--active)}.chip-warn.chip-on{border-color:var(--warn)}.chip-ok.chip-on{border-color:var(--ok)}.chip-error.chip-on{border-color:var(--err)}
 
+/* library filter groups */
+.filters{display:flex;flex-direction:column;gap:.2rem;margin:.6rem 0 1rem}
+.filter-group{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+.filter-group .chips{margin:.25rem 0}
+.filter-lbl{font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);min-width:74px}
+
 /* book list */
 .booklist{display:flex;flex-direction:column;gap:.5rem}
 .booklist.compact .book{padding:.4rem .6rem}
@@ -73,6 +79,28 @@ input[type=checkbox],input[type=radio]{width:auto}
 .lang{text-transform:uppercase;font-size:.74rem}
 .rating{color:#e7c073;font-size:.85rem;white-space:nowrap}.rating.muted{color:#8a94a0}
 .empty{padding:1.2rem 0}
+
+/* reading-status pill */
+.status{display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.74rem;border:1px solid;white-space:nowrap}
+.status-read{background:var(--ok-d);border-color:var(--ok);color:#8fdca8}
+.status-reading{background:var(--active-d);border-color:var(--active);color:#9ecbf5}
+.status-to_read{background:#2a2f34;border-color:#555;color:#cdd5dd}
+.status-dnf{background:var(--err-d);border-color:var(--err);color:#e89a9a}
+
+/* ownership indicator: left-border accent + badge, greyed out when not owned */
+.own{display:inline-block;padding:.12rem .55rem;border-radius:999px;font-size:.76rem;border:1px solid;white-space:nowrap}
+.own-badge-owned{background:var(--ok-d);border-color:var(--ok);color:#8fdca8}
+.own-badge-downloading{background:var(--active-d);border-color:var(--active);color:#9ecbf5}
+.own-badge-requested{background:var(--warn-d);border-color:var(--warn);color:#e7c073}
+.own-badge-notfound{background:var(--err-d);border-color:var(--err);color:#e89a9a}
+.own-badge-missing{background:#23272c;border-color:#444;color:#7a838d}
+.book.own-owned{border-left-color:var(--ok)}
+.book.own-downloading{border-left-color:var(--active)}
+.book.own-requested{border-left-color:var(--warn)}
+.book.own-notfound{border-left-color:var(--err)}
+.book.own-missing{border-left-color:#3a424b;opacity:.62}
+.book.own-missing:hover{opacity:1}
+.book.own-missing .cover{filter:grayscale(.7)}
 
 /* progress (live sync) */
 .progress{margin:.6rem 0}

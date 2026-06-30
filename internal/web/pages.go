@@ -4,20 +4,111 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/store"
 )
 
+// chip is one filter pill: a label, the href that applies it (preserving the
+// other active filters), an optional count, and whether it is currently active.
+type chip struct {
+	Label, Href string
+	N           int
+	On          bool
+}
+
+// libHref renders a Library URL from a filter, omitting empty fields.
+func libHref(f store.LibraryFilter) string {
+	v := url.Values{}
+	if f.State != "" {
+		v.Set("state", f.State)
+	}
+	if f.Status != "" {
+		v.Set("status", f.Status)
+	}
+	if f.Tag != "" {
+		v.Set("tag", f.Tag)
+	}
+	if f.Owned != "" {
+		v.Set("owned", f.Owned)
+	}
+	if f.Q != "" {
+		v.Set("q", f.Q)
+	}
+	if len(v) == 0 {
+		return "/queue"
+	}
+	return "/queue?" + v.Encode()
+}
+
+// withField clones a filter overriding exactly one field, for chip hrefs that
+// keep every other active filter intact.
+func withField(f store.LibraryFilter, field, val string) store.LibraryFilter {
+	switch field {
+	case "status":
+		f.Status = val
+	case "tag":
+		f.Tag = val
+	case "owned":
+		f.Owned = val
+	}
+	return f
+}
+
 func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
-	state := r.URL.Query().Get("state")
-	q := r.URL.Query().Get("q")
-	rows, _ := s.st.ListBooks(ctx, state, q, 1000)
-	counts, _ := s.st.StateCounts(ctx)
-	s.render(w, r, "queue", "Queue", map[string]any{
-		"Rows": rows, "State": state, "Q": q, "Counts": counts, "Shown": len(rows),
+	f := store.LibraryFilter{
+		State:  r.URL.Query().Get("state"),
+		Status: r.URL.Query().Get("status"),
+		Tag:    r.URL.Query().Get("tag"),
+		Owned:  r.URL.Query().Get("owned"),
+		Q:      r.URL.Query().Get("q"),
+		Limit:  1000,
+	}
+	rows, _ := s.st.ListLibrary(ctx, f)
+	statusCounts, _ := s.st.ReadingStatusCounts(ctx)
+	tagCounts, _ := s.st.TopicTagCounts(ctx)
+	owned, _ := s.st.OwnedCount(ctx)
+
+	// Reading-status chips (All + each status), each preserving the other filters.
+	statusChips := []chip{{Label: "All", Href: libHref(withField(f, "status", "")), On: f.Status == ""}}
+	for _, st := range []string{"to_read", "reading", "read", "dnf"} {
+		statusChips = append(statusChips, chip{
+			Label: readingLabel(st), N: statusCounts[st], On: f.Status == st,
+			Href: libHref(withField(f, "status", st)),
+		})
+	}
+	// Ownership chips.
+	ownChips := []chip{
+		{Label: "All", Href: libHref(withField(f, "owned", "")), On: f.Owned == ""},
+		{Label: "Owned", N: owned, Href: libHref(withField(f, "owned", "owned")), On: f.Owned == "owned"},
+		{Label: "Not owned", Href: libHref(withField(f, "owned", "missing")), On: f.Owned == "missing"},
+	}
+	// Topic-tag chips, sorted for stable order; clicking the active tag clears it.
+	slugs := make([]string, 0, len(tagCounts))
+	for slug := range tagCounts {
+		slugs = append(slugs, slug)
+	}
+	sort.Strings(slugs)
+	tagChips := make([]chip, 0, len(slugs))
+	for _, slug := range slugs {
+		next := slug
+		if f.Tag == slug {
+			next = ""
+		}
+		tagChips = append(tagChips, chip{
+			Label: slug, N: tagCounts[slug], On: f.Tag == slug,
+			Href: libHref(withField(f, "tag", next)),
+		})
+	}
+
+	s.render(w, r, "queue", "Library", map[string]any{
+		"Rows": rows, "Shown": len(rows),
+		"Q": f.Q, "State": f.State, "Status": f.Status, "Tag": f.Tag, "Owned": f.Owned,
+		"StatusChips": statusChips, "OwnChips": ownChips, "TagChips": tagChips,
+		"HasTags": len(tagChips) > 0,
 	})
 }
 

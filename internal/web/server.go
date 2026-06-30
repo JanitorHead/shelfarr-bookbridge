@@ -51,13 +51,17 @@ func (s *Server) SetDiscoverer(fn func(ctx context.Context) ([]sources.Shelf, er
 
 func New(st *store.Store, run Runner) *Server {
 	funcs := template.FuncMap{
-		"stateClass": stateClass,
-		"stateLabel": stateLabel,
-		"initials":   initials,
-		"list":       list,
-		"optLabel":   optLabel,
-		"dateOnly":   dateOnly,
-		"stars":      stars,
+		"stateClass":   stateClass,
+		"stateLabel":   stateLabel,
+		"initials":     initials,
+		"list":         list,
+		"optLabel":     optLabel,
+		"dateOnly":     dateOnly,
+		"stars":        stars,
+		"ownership":    ownership,
+		"ownLabel":     ownLabel,
+		"readingLabel": readingLabel,
+		"topicTags":    topicTags,
 	}
 	t := template.Must(template.New("").Funcs(funcs).ParseFS(tmplFS, "templates/*.html"))
 	return &Server{st: st, run: run, tmpl: t, getenv: os.Getenv, sess: map[string]*session{}}

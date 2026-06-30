@@ -8,6 +8,7 @@ import (
 // LibraryFilter selects which catalog books the Library page shows. Every field
 // is optional; the zero value lists the whole library, newest-updated first.
 type LibraryFilter struct {
+	State  string // optional download-lifecycle state (dashboard drill-down)
 	Status string // reading_status: to_read | reading | read | dnf
 	Tag    string // a topic-shelf slug the book must belong to
 	Owned  string // "owned" | "missing" — ownership in the Calibre (CWA) library
@@ -25,6 +26,10 @@ func (s *Store) ListLibrary(ctx context.Context, f LibraryFilter) ([]BookRow, er
 	query := `SELECT ` + bookCols + ` FROM books b`
 	var where []string
 	args := []any{}
+	if f.State != "" {
+		where = append(where, "b.state=?")
+		args = append(args, f.State)
+	}
 	if f.Status != "" {
 		where = append(where, "b.reading_status=?")
 		args = append(args, f.Status)

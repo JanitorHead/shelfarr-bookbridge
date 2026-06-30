@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 4
+const schemaVersion = 5
 
 type Store struct{ db *sql.DB }
 
@@ -74,6 +74,15 @@ CREATE INDEX IF NOT EXISTS idx_book_shelves_shelf ON book_shelves(shelf);`,
 INSERT OR IGNORE INTO run_state(id, running) VALUES (1, 0);`,
 		// v4
 		`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+		// v5
+		`CREATE TABLE IF NOT EXISTS runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at TEXT NOT NULL, finished_at TEXT NOT NULL,
+  mode TEXT NOT NULL, ok INTEGER NOT NULL,
+  fetched INTEGER NOT NULL DEFAULT 0, new INTEGER NOT NULL DEFAULT 0,
+  requested INTEGER NOT NULL DEFAULT 0, not_found INTEGER NOT NULL DEFAULT 0,
+  errors INTEGER NOT NULL DEFAULT 0, summary TEXT NOT NULL DEFAULT '', error_text TEXT NOT NULL DEFAULT '');
+CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at DESC);`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

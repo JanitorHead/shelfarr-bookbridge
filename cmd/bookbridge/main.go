@@ -97,13 +97,32 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 	if err != nil {
 		return engine.Report{}, err
 	}
-	return e.Run(context.Background(), dryRun)
+	start := time.Now()
+	mode := "apply"
+	if dryRun {
+		mode = "dry-run"
+	}
+	rep, runErr := e.Run(context.Background(), dryRun)
+	rec := store.RunRecord{
+		StartedAt: start, FinishedAt: time.Now(), Mode: mode, OK: runErr == nil,
+		Fetched: rep.Fetched, New: rep.New, Requested: rep.Requested, NotFound: rep.NotFound,
+		Errors: rep.Errors, Summary: reportLine(mode, rep),
+	}
+	if runErr != nil {
+		rec.ErrorText = runErr.Error()
+	}
+	_, _ = st.RecordRun(context.Background(), rec)
+	return rep, runErr
+}
+
+func reportLine(mode string, rep engine.Report) string {
+	return fmt.Sprintf("[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d",
+		mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors,
+		rep.Reconciled, rep.Completed, rep.Failed, rep.Rechecked, rep.Parked)
 }
 
 func printReport(out io.Writer, mode string, rep engine.Report) {
-	fmt.Fprintf(out, "[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d\n",
-		mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors,
-		rep.Reconciled, rep.Completed, rep.Failed, rep.Rechecked, rep.Parked)
+	fmt.Fprintln(out, reportLine(mode, rep))
 }
 
 func runSync(args []string, getenv func(string) string, out io.Writer) int {

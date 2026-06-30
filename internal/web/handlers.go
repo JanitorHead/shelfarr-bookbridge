@@ -3,10 +3,102 @@ package web
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/auth"
 )
+
+func itoa(n int) string     { return strconv.Itoa(n) }
+func ftoa(f float64) string { return strconv.FormatFloat(f, 'g', -1, 64) }
+func btoa(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+func onoff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
+}
+
+// settingFields are the non-secret settings editable in the GUI (env-var keys).
+var settingFields = []struct{ Key, Label, Kind string }{
+	{"SHELFARR_URL", "Shelfarr URL", "text"},
+	{"GOODREADS_USER_ID", "Goodreads user id", "text"},
+	{"GOODREADS_VISIBILITY", "Goodreads visibility (public/private)", "text"},
+	{"SHELVES", "Shelves (comma-separated)", "text"},
+	{"FORMAT", "Format (ebook/audiobook)", "text"},
+	{"SCHEDULE", "Schedule (cron)", "text"},
+	{"MAX_REQUESTS_PER_RUN", "Max requests per run", "text"},
+	{"SIMILARITY_THRESHOLD", "Similarity threshold (0-1)", "text"},
+	{"FIRST_RUN", "First run (baseline/backfill)", "text"},
+	{"LANG_INFERENCE", "Language inference (on/off)", "text"},
+	{"SHELFARR_INSECURE", "Allow http to non-loopback Shelfarr (true/false)", "text"},
+	{"GUI_PORT", "GUI port", "text"},
+	{"AUTH_METHOD", "Auth method (forms/none)", "text"},
+	{"AUTH_REQUIRED", "Auth required (enabled/local)", "text"},
+}
+
+var secretFields = []struct{ Key, Label string }{
+	{"SHELFARR_TOKEN", "Shelfarr API token"},
+	{"GOODREADS_COOKIE", "Goodreads session cookie"},
+	{"GOODREADS_FEED_KEY", "Goodreads RSS feed key"},
+}
+
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	if r.Method == http.MethodPost {
+		if !s.localNoSession(r) && !s.requireCSRF(w, r) {
+			return
+		}
+		r.ParseForm()
+		for _, f := range settingFields {
+			if v := r.PostFormValue(f.Key); v != "" {
+				s.st.SetSetting(ctx, f.Key, v)
+			}
+		}
+		for _, f := range secretFields {
+			if v := r.PostFormValue(f.Key); v != "" { // only overwrite when provided
+				s.st.SetSetting(ctx, f.Key, v)
+			}
+		}
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+		return
+	}
+	all, _ := s.st.AllSettings(ctx)
+	cfg := s.cfg()
+	type field struct{ Key, Label, Value string }
+	var fields []field
+	cur := map[string]string{
+		"SHELFARR_URL": cfg.ShelfarrURL, "GOODREADS_USER_ID": cfg.GoodreadsUserID,
+		"GOODREADS_VISIBILITY": all["GOODREADS_VISIBILITY"], "SHELVES": strings.Join(cfg.Shelves, ","),
+		"FORMAT": cfg.Format, "SCHEDULE": cfg.Schedule, "MAX_REQUESTS_PER_RUN": itoa(cfg.MaxRequestsPerRun),
+		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
+		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),
+		"GUI_PORT": cfg.GUIPort, "AUTH_METHOD": cfg.AuthMethod, "AUTH_REQUIRED": cfg.AuthRequired,
+	}
+	for _, f := range settingFields {
+		fields = append(fields, field{f.Key, f.Label, cur[f.Key]})
+	}
+	type secret struct {
+		Key, Label string
+		Set        bool
+	}
+	var secrets []secret
+	for _, f := range secretFields {
+		_, ok, _ := s.st.GetSetting(ctx, f.Key)
+		secrets = append(secrets, secret{f.Key, f.Label, ok})
+	}
+	s.render(w, r, "settings", "Settings", map[string]any{"Fields": fields, "Secrets": secrets})
+}
+
+func (s *Server) localNoSession(r *http.Request) bool {
+	return s.session(r) == nil && auth.IsLocalAddr(r.RemoteAddr)
+}
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()

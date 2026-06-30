@@ -1,1 +1,6 @@
-{{define "content"}}<p>{{.Title}}</p>{{end}}
+{{define "content"}}<h1>Settings</h1>
+<form method="post" action="/settings"><input type="hidden" name="csrf" value="{{.CSRF}}">
+{{range .Fields}}<label>{{.Label}}</label><input name="{{.Key}}" value="{{.Value}}">{{end}}
+<h2>Secrets <span class="muted">(leave blank to keep current)</span></h2>
+{{range .Secrets}}<label>{{.Label}} — {{if .Set}}<span class="set">set</span>{{else}}<span class="unset">not set</span>{{end}}</label><input name="{{.Key}}" type="password" placeholder="••••••••">{{end}}
+<button type="submit">Save</button></form>{{end}}

@@ -2,13 +2,13 @@ package web
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/auth"
+	"github.com/JanitorHead/shelfarr-bookbridge/internal/scheduler"
 )
 
 func itoa(n int) string     { return strconv.Itoa(n) }
@@ -160,10 +160,18 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			cells = append(cells, cell{k, n})
 		}
 	}
-	lastRun, _, _ := s.st.GetSetting(ctx, "LAST_RUN")
+	running, startedAt, _ := s.st.RunState(ctx)
+	last, hasLast, _ := s.st.LatestRun(ctx)
+	recent, _ := s.st.RecentRuns(ctx, 5)
+	var next time.Time
+	if sched := s.cfg().Schedule; sched != "" {
+		next, _ = scheduler.Next(sched, time.Now())
+	}
 	needsAuth := s.settingValue("GOODREADS_COOKIE") == "" && s.settingValue("GOODREADS_FEED_KEY") == ""
 	s.render(w, r, "dashboard", "Dashboard", map[string]any{
-		"Cells": cells, "LastRun": lastRun, "NeedsAuth": needsAuth,
+		"Cells": cells, "NeedsAuth": needsAuth,
+		"Running": running, "StartedAt": startedAt,
+		"Last": last, "HasLast": hasLast, "Recent": recent, "NextRun": next,
 	})
 }
 
@@ -177,20 +185,9 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 	}
 	r.ParseForm()
 	dryRun := r.PostFormValue("mode") == "dryrun"
-	rep, err := s.run(dryRun)
-	mode := "apply"
-	if dryRun {
-		mode = "dry-run"
-	}
-	var summary string
-	if err != nil {
-		summary = fmt.Sprintf("[%s] error: %v", mode, err)
-	} else {
-		summary = fmt.Sprintf("[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d",
-			mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors,
-			rep.Reconciled, rep.Completed, rep.Failed, rep.Rechecked, rep.Parked)
-	}
-	s.st.SetSetting(context.Background(), "LAST_RUN", summary)
+	// Run outcomes are persisted at the runOnce choke point (R2) and surfaced via
+	// RunState/LatestRun on the dashboard (R3); nothing to record here.
+	_, _ = s.run(dryRun)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

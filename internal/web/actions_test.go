@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -10,7 +11,7 @@ import (
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/store"
 )
 
-func TestSyncActionRunsAndRecordsLastRun(t *testing.T) {
+func TestSyncActionRunsRunner(t *testing.T) {
 	st, _ := store.Open(t.TempDir() + "/bb.db")
 	defer st.Close()
 	called := false
@@ -24,7 +25,7 @@ func TestSyncActionRunsAndRecordsLastRun(t *testing.T) {
 	if !called {
 		t.Fatal("runner was not invoked")
 	}
-	if v, _, _ := st.GetSetting(reqCtx(), "LAST_RUN"); !strings.Contains(v, "requested=2") {
-		t.Fatalf("LAST_RUN not recorded: %q", v)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("sync should redirect, got %d", rec.Code)
 	}
 }

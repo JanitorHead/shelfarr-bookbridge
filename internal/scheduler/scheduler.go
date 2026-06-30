@@ -1,6 +1,10 @@
 package scheduler
 
-import "github.com/robfig/cron/v3"
+import (
+	"time"
+
+	"github.com/robfig/cron/v3"
+)
 
 type Scheduler struct{ c *cron.Cron }
 
@@ -15,3 +19,13 @@ func New(cronExpr string, fn func()) (*Scheduler, error) {
 
 func (s *Scheduler) Start() { s.c.Start() }
 func (s *Scheduler) Stop()  { s.c.Stop() }
+
+// Next returns the next activation time of a 5-field cron expression after the
+// given time, used by the GUI to show the upcoming scheduled run.
+func Next(expr string, after time.Time) (time.Time, error) {
+	sched, err := cron.ParseStandard(expr)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return sched.Next(after), nil
+}

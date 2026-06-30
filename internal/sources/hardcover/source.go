@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
@@ -79,10 +80,30 @@ func (s *Source) Fetch(ctx context.Context, shelves []string) ([]sources.Book, e
 	return all, nil
 }
 
+// userBooksQuery pulls the full personal record per book: the user's rating,
+// reading dates, and progress (latest read first), plus book metadata. A single
+// wrong field name fails the whole query, so this is validated live before ship.
 const userBooksQuery = `query($status: Int!) {
   me {
     user_books(where: {status_id: {_eq: $status}}, limit: 1000) {
-      book { id title release_year contributions { author { name } } }
+      rating
+      status_id
+      user_book_reads(order_by: {started_at: desc_nulls_last}) {
+        started_at
+        finished_at
+        progress
+        progress_pages
+        edition { pages }
+      }
+      book {
+        id
+        title
+        release_year
+        pages
+        description
+        contributions { author { name } }
+        image { url }
+      }
     }
   }
 }`
@@ -119,21 +140,54 @@ func (s *Source) do(ctx context.Context, query string, vars map[string]any) ([]b
 	return b, nil
 }
 
-// parseUserBooks maps a Hardcover user_books GraphQL response into Books.
+// hcDateLayouts are the date formats Hardcover returns for read dates.
+var hcDateLayouts = []string{"2006-01-02", time.RFC3339, "2006-01-02T15:04:05"}
+
+func hcDate(s string) time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}
+	}
+	for _, l := range hcDateLayouts {
+		if t, err := time.Parse(l, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+// parseUserBooks maps a Hardcover user_books GraphQL response into Books,
+// including the user's rating, reading dates, and progress.
 func parseUserBooks(data []byte, shelf string) ([]sources.Book, error) {
 	var resp struct {
 		Data struct {
 			Me []struct {
 				UserBooks []struct {
+					Rating        float64 `json:"rating"`
+					StatusID      int     `json:"status_id"`
+					UserBookReads []struct {
+						StartedAt     string  `json:"started_at"`
+						FinishedAt    string  `json:"finished_at"`
+						Progress      float64 `json:"progress"`
+						ProgressPages int     `json:"progress_pages"`
+						Edition       struct {
+							Pages int `json:"pages"`
+						} `json:"edition"`
+					} `json:"user_book_reads"`
 					Book struct {
 						ID            int    `json:"id"`
 						Title         string `json:"title"`
 						ReleaseYear   int    `json:"release_year"`
+						Pages         int    `json:"pages"`
+						Description   string `json:"description"`
 						Contributions []struct {
 							Author struct {
 								Name string `json:"name"`
 							} `json:"author"`
 						} `json:"contributions"`
+						Image struct {
+							URL string `json:"url"`
+						} `json:"image"`
 					} `json:"book"`
 				} `json:"user_books"`
 			} `json:"me"`
@@ -159,15 +213,53 @@ func parseUserBooks(data []byte, shelf string) ([]sources.Book, error) {
 			if len(bk.Contributions) > 0 {
 				author = bk.Contributions[0].Author.Name
 			}
-			out = append(out, sources.Book{
-				Source:     "hardcover",
-				ExternalID: strconv.Itoa(bk.ID),
-				Title:      bk.Title,
-				Author:     author,
-				Year:       bk.ReleaseYear,
-				Shelves:    []string{shelf},
-			})
+			b := sources.Book{
+				Source:      "hardcover",
+				ExternalID:  strconv.Itoa(bk.ID),
+				Title:       bk.Title,
+				Author:      author,
+				Year:        bk.ReleaseYear,
+				Description: bk.Description,
+				CoverURL:    bk.Image.URL,
+				UserRating:  int(ub.Rating + 0.5), // round 0–5 stars to our int field
+				Shelves:     []string{shelf},
+			}
+			// The reads are ordered newest-first; the first one carries the most
+			// recent dates and progress.
+			if len(ub.UserBookReads) > 0 {
+				r := ub.UserBookReads[0]
+				b.StartedAt = hcDate(r.StartedAt)
+				b.ReadAt = hcDate(r.FinishedAt)
+				pages := r.Edition.Pages
+				if pages == 0 {
+					pages = bk.Pages
+				}
+				b.ProgressPct = readingPct(r.Progress, r.ProgressPages, pages)
+				if r.ProgressPages > 0 && pages > 0 {
+					b.ProgressLabel = fmt.Sprintf("page %d of %d", r.ProgressPages, pages)
+				}
+			}
+			out = append(out, b)
 		}
 	}
 	return out, nil
+}
+
+// readingPct resolves a 0–100 progress percentage: prefer Hardcover's own
+// progress value, else derive it from pages read over total pages.
+func readingPct(progress float64, pagesRead, totalPages int) int {
+	if progress > 0 {
+		if progress > 100 {
+			progress = 100
+		}
+		return int(progress + 0.5)
+	}
+	if pagesRead > 0 && totalPages > 0 {
+		pct := float64(pagesRead) / float64(totalPages) * 100
+		if pct > 100 {
+			pct = 100
+		}
+		return int(pct + 0.5)
+	}
+	return 0
 }

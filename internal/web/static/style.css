@@ -74,6 +74,11 @@ input[type=checkbox],input[type=radio]{width:auto}
 .bk-main{min-width:0}
 .bk-title{font-weight:600;font-size:.96rem;overflow:hidden;text-overflow:ellipsis}
 .bk-sub{color:var(--muted);font-size:.83rem;margin-top:.15rem}
+.bk-progress{display:flex;align-items:center;gap:.5rem;margin-top:.3rem;max-width:340px}
+.bk-progress progress{flex:1;height:7px;-webkit-appearance:none;appearance:none;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:#2a2f34}
+.bk-progress progress::-webkit-progress-bar{background:#2a2f34}
+.bk-progress progress::-webkit-progress-value{background:var(--active)}
+.bk-progress progress::-moz-progress-bar{background:var(--active)}
 .bk-meta{display:flex;gap:.5rem;align-items:center;white-space:nowrap}
 .tag{display:inline-block;background:#2c333a;border:1px solid var(--border);border-radius:5px;padding:0 .35rem;font-size:.74rem;color:#aeb8c2;margin-left:.25rem}
 .lang{text-transform:uppercase;font-size:.74rem}

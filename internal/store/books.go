@@ -211,6 +211,9 @@ type BookRow struct {
 	UserRating                                                                      int
 	AverageRating                                                                   float64
 	AddedAt                                                                         string
+	StartedAt, ReadAt                                                               string
+	ProgressPct                                                                     int
+	ProgressLabel                                                                   string
 	OwnedInCWA                                                                      bool
 	CalibreID                                                                       int
 	Shelves                                                                         []string
@@ -220,6 +223,7 @@ type BookRow struct {
 const bookCols = `b.source,b.external_id,b.title,b.author,b.state,COALESCE(b.work_id,''),
 	  COALESCE(b.shelfarr_request_id,''),COALESCE(b.chosen_language,''),b.attempt_count,COALESCE(b.cover_url,''),
 	  COALESCE(b.user_rating,0),COALESCE(b.average_rating,0),COALESCE(b.added_at,''),COALESCE(b.reading_status,''),
+	  COALESCE(b.started_at,''),COALESCE(b.read_at,''),COALESCE(b.progress_pct,0),COALESCE(b.progress_label,''),
 	  COALESCE(b.owned_in_cwa,0),COALESCE(b.calibre_id,0),
 	  COALESCE((SELECT GROUP_CONCAT(shelf, ',') FROM book_shelves bs WHERE bs.source=b.source AND bs.external_id=b.external_id),'')`
 
@@ -230,7 +234,7 @@ func scanBookRows(rows *sql.Rows) ([]BookRow, error) {
 	for rows.Next() {
 		var b BookRow
 		var shelvesCSV string
-		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &b.UserRating, &b.AverageRating, &b.AddedAt, &b.ReadingStatus, &b.OwnedInCWA, &b.CalibreID, &shelvesCSV); err != nil {
+		if err := rows.Scan(&b.Source, &b.ExternalID, &b.Title, &b.Author, &b.State, &b.WorkID, &b.RequestID, &b.Language, &b.AttemptCount, &b.CoverURL, &b.UserRating, &b.AverageRating, &b.AddedAt, &b.ReadingStatus, &b.StartedAt, &b.ReadAt, &b.ProgressPct, &b.ProgressLabel, &b.OwnedInCWA, &b.CalibreID, &shelvesCSV); err != nil {
 			return nil, err
 		}
 		if shelvesCSV != "" {

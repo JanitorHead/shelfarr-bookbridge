@@ -1,7 +1,8 @@
 {{define "bookrow"}}{{$own := ownership .}}<div class="book own-{{$own}}">
 <div class="cover">{{if .CoverURL}}<img src="{{.CoverURL}}" alt="" loading="lazy">{{else}}<span class="cover-ph">{{initials .Title}}</span>{{end}}</div>
 <div class="bk-main"><div class="bk-title">{{.Title}}</div>
-<div class="bk-sub">{{.Author}}{{range topicTags .Shelves}} <span class="tag">{{.}}</span>{{end}}{{with dateOnly .AddedAt}} <span class="muted">· added {{.}}</span>{{end}}</div></div>
+<div class="bk-sub">{{.Author}}{{range topicTags .Shelves}} <span class="tag">{{.}}</span>{{end}}{{with dateOnly .ReadAt}} <span class="muted">· read {{.}}</span>{{else}}{{with dateOnly .AddedAt}} <span class="muted">· added {{.}}</span>{{end}}{{end}}</div>
+{{if .ProgressPct}}<div class="bk-progress"><progress value="{{.ProgressPct}}" max="100"></progress><span class="muted small">{{.ProgressPct}}%{{with .ProgressLabel}} · {{.}}{{end}}</span></div>{{end}}</div>
 <div class="bk-meta">
 {{if .ReadingStatus}}<span class="status status-{{.ReadingStatus}}">{{readingLabel .ReadingStatus}}</span>{{end}}
 {{if .UserRating}}<span class="rating" title="your rating">{{stars .UserRating}}</span>{{else if .AverageRating}}<span class="rating muted" title="community average">{{printf "%.1f" .AverageRating}}★</span>{{end}}

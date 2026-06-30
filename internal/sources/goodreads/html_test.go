@@ -8,6 +8,9 @@ const sampleHTML = `<html><head><title>Rafa's books</title></head><body>
  <td class="field title"><div class="value"><a href="/book/show/12345.El_Nombre_del_Viento" title="El Nombre del Viento">El Nombre del Viento</a></div></td>
  <td class="field author"><div class="value"><a href="/author/show/1.x">Rothfuss, Patrick</a></div></td>
  <td class="field isbn"><div class="value">8401352835</div></td>
+ <td class="field date_started"><div class="value"><span class="date_date_started_value">Jan 05, 2024</span></div></td>
+ <td class="field date_read"><div class="value"><span class="date_date_read_value">Feb 20, 2024</span></div></td>
+ <td class="field date_added"><div class="value">Dec 01, 2023</div></td>
 </tr>
 <tr id="review_2">
  <td class="field title"><div class="value"><a href="/book/show/67890.The_Wise_Mans_Fear" title="The Wise Man's Fear">The Wise Man&#39;s Fear</a></div></td>
@@ -40,6 +43,18 @@ func TestParseHTMLList(t *testing.T) {
 	}
 	if books[0].Shelves[0] != "to-read" {
 		t.Fatalf("shelf not tagged: %v", books[0].Shelves)
+	}
+	if got := books[0].StartedAt.Format("2006-01-02"); got != "2024-01-05" {
+		t.Fatalf("started_at: got %q", got)
+	}
+	if got := books[0].ReadAt.Format("2006-01-02"); got != "2024-02-20" {
+		t.Fatalf("read_at: got %q", got)
+	}
+	if got := books[0].AddedAt.Format("2006-01-02"); got != "2023-12-01" {
+		t.Fatalf("added_at: got %q", got)
+	}
+	if !books[1].StartedAt.IsZero() {
+		t.Fatalf("book with no dates should have zero StartedAt, got %v", books[1].StartedAt)
 	}
 }
 

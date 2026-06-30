@@ -5,12 +5,43 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/sources"
 	"github.com/PuerkitoBio/goquery"
 )
 
 var bookIDRe = regexp.MustCompile(`/book/show/(\d+)`)
+
+// grHTMLDateLayouts are the display formats Goodreads renders date columns in
+// (print view), distinct from the RFC-style dates in RSS (grDateLayouts).
+var grHTMLDateLayouts = []string{"Jan 02, 2006", "Jan 2006", "2006/01/02", "Jan 02 2006"}
+
+// grDate parses a Goodreads date cell, returning the zero time for blanks or
+// the "not set" placeholder. It tolerates the few formats Goodreads uses.
+func grDate(s string) time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" || strings.EqualFold(s, "not set") {
+		return time.Time{}
+	}
+	for _, layout := range grHTMLDateLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+// dateCell reads a review/list date field's display value (Goodreads wraps the
+// shown date in span.date_<field>_value inside the cell, falling back to the
+// cell text).
+func dateCell(row *goquery.Selection, field string) time.Time {
+	cell := row.Find("td.field." + field + " div.value")
+	if v := strings.TrimSpace(cell.Find("span.date_" + field + "_value").Text()); v != "" {
+		return grDate(v)
+	}
+	return grDate(cell.Text())
+}
 
 // htmlUserRating reads the user's rating (0–5) from a review/list row; Goodreads
 // renders it as filled-star spans (class "p10"). Best-effort: 0 when absent.
@@ -57,6 +88,9 @@ func parseHTMLList(data []byte, shelf string) ([]sources.Book, bool, error) {
 			CoverURL:      upscaleGRCover(strings.TrimSpace(cover)),
 			UserRating:    htmlUserRating(row),
 			AverageRating: avg,
+			AddedAt:       dateCell(row, "date_added"),
+			StartedAt:     dateCell(row, "date_started"),
+			ReadAt:        dateCell(row, "date_read"),
 		})
 	})
 	return out, false, nil

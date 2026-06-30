@@ -153,9 +153,10 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 	return rep, runErr
 }
 
-// cwaTagPass tags downloaded ('done') books in the Calibre library (via CWA) with
-// their Goodreads shelves as "gr:<shelf>" tags, merged with the book's existing
-// tags. Each book is tagged at most once (cwa_tagged flag).
+// cwaTagPass mirrors each downloaded ('done') book's Goodreads shelves into the
+// Calibre library via CWA: it adds the book to a Calibre-Web Shelf named after
+// each Goodreads shelf (creating the shelf if needed) AND sets "gr:<shelf>" tags
+// (merged with existing tags). Each book is processed at most once (cwa_tagged).
 func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 	ctx := context.Background()
 	pending, err := st.DoneUntaggedForCWA(ctx)
@@ -172,21 +173,45 @@ func cwaTagPass(st *store.Store, cfg config.Config, out io.Writer) {
 		fmt.Fprintln(out, "[cwa]", err)
 		return
 	}
-	tagged := 0
+	shelfIDs, err := client.Shelves(ctx) // name -> id (created on demand below)
+	if err != nil {
+		fmt.Fprintln(out, "[cwa]", err)
+		return
+	}
+	ensureShelf := func(name string) (int, error) {
+		if id, ok := shelfIDs[name]; ok {
+			return id, nil
+		}
+		id, err := client.CreateShelf(ctx, name)
+		if err == nil {
+			shelfIDs[name] = id
+		}
+		return id, err
+	}
+	done := 0
 	for _, b := range pending {
 		cal := bestCalibreMatch(b, lib)
 		if cal == nil {
 			continue // not in the Calibre library yet
 		}
+		for _, shelf := range b.Shelves {
+			id, err := ensureShelf(shelf)
+			if err != nil {
+				fmt.Fprintln(out, "[cwa]", err)
+				continue
+			}
+			if err := client.AddToShelf(ctx, id, cal.ID); err != nil {
+				fmt.Fprintln(out, "[cwa]", err)
+			}
+		}
 		if err := client.SetTags(ctx, cal.ID, mergeGRTags(cal.Tags, b.Shelves)); err != nil {
 			fmt.Fprintln(out, "[cwa]", err)
-			continue
 		}
 		_ = st.MarkCWATagged(ctx, b.Source, b.ExternalID)
-		tagged++
+		done++
 	}
-	if tagged > 0 {
-		fmt.Fprintf(out, "[cwa] tagged %d book(s) in Calibre with their Goodreads shelves\n", tagged)
+	if done > 0 {
+		fmt.Fprintf(out, "[cwa] mirrored %d book(s) into Calibre shelves + tags\n", done)
 	}
 }
 

@@ -81,7 +81,7 @@ func (s *Source) Fetch(ctx context.Context, shelves []string) ([]sources.Book, e
 
 const userBooksQuery = `query($status: Int!) {
   me {
-    user_books(where: {status_id: {_eq: $status}}) {
+    user_books(where: {status_id: {_eq: $status}}, limit: 1000) {
       book { id title release_year contributions { author { name } } }
     }
   }

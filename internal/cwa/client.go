@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,12 @@ import (
 	"github.com/JanitorHead/shelfarr-bookbridge/internal/config"
 	"github.com/PuerkitoBio/goquery"
 )
+
+var shelfIDRe = regexp.MustCompile(`^/shelf/(\d+)$`)
+
+// shelfCountRe strips the " (N)" book-count suffix Calibre-Web appends to a
+// shelf's sidebar label, leaving just the shelf name.
+var shelfCountRe = regexp.MustCompile(`\s*\(\d+\)\s*$`)
 
 // Book is a Calibre library entry as returned by /ajax/listbooks.
 type Book struct {
@@ -139,6 +146,77 @@ func (c *Client) SetTags(ctx context.Context, id int, tags []string) error {
 		return fmt.Errorf("CWA rejected the tag edit: %s", strings.TrimSpace(string(b)))
 	}
 	return nil
+}
+
+// Shelves returns the user's Calibre-Web shelves as name->id (scraped from the
+// sidebar, since CWA has no list-shelves API).
+func (c *Client) Shelves(ctx context.Context) (map[string]int, error) {
+	req, _ := http.NewRequestWithContext(ctx, "GET", c.base+"/", nil)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]int{}
+	doc.Find("a[href]").Each(func(_ int, a *goquery.Selection) {
+		href, _ := a.Attr("href")
+		m := shelfIDRe.FindStringSubmatch(strings.TrimPrefix(href, c.base))
+		if m == nil {
+			return
+		}
+		name := shelfCountRe.ReplaceAllString(strings.TrimSpace(a.Text()), "")
+		if name != "" {
+			id, _ := strconv.Atoi(m[1])
+			out[name] = id
+		}
+	})
+	return out, nil
+}
+
+// CreateShelf creates a (private) shelf and returns its id.
+func (c *Client) CreateShelf(ctx context.Context, name string) (int, error) {
+	form := url.Values{"title": {name}, "csrf_token": {c.csrf}}
+	req, _ := http.NewRequestWithContext(ctx, "POST", c.base+"/shelf/create", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-CSRFToken", c.csrf)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	resp.Body.Close()
+	if loc := resp.Header.Get("Location"); loc != "" {
+		if m := shelfIDRe.FindStringSubmatch(strings.TrimPrefix(loc, c.base)); m != nil {
+			id, _ := strconv.Atoi(m[1])
+			return id, nil
+		}
+	}
+	if sh, _ := c.Shelves(ctx); sh[name] != 0 { // fallback: re-scrape
+		return sh[name], nil
+	}
+	return 0, fmt.Errorf("CWA: created shelf %q but could not resolve its id", name)
+}
+
+// AddToShelf adds a book to a shelf (idempotent on CWA's side).
+func (c *Client) AddToShelf(ctx context.Context, shelfID, bookID int) error {
+	req, _ := http.NewRequestWithContext(ctx, "POST",
+		fmt.Sprintf("%s/shelf/add/%d/%d", c.base, shelfID, bookID), nil)
+	req.Header.Set("X-CSRFToken", c.csrf)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	switch resp.StatusCode {
+	case 204, 200, 302:
+		return nil
+	default:
+		return fmt.Errorf("CWA add-to-shelf HTTP %d", resp.StatusCode)
+	}
 }
 
 // SplitTags parses CWA's comma-separated tag string.

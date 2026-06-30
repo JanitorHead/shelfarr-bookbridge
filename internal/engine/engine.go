@@ -48,6 +48,24 @@ func (e *Engine) detectLang(b sources.Book) string {
 
 var ErrRunInProgress = errors.New("a sync run is already in progress")
 
+// formatFor picks the request format from the highest-priority shelf override
+// (by configured order) the book belongs to, else the global format.
+func (e *Engine) formatFor(ctx context.Context, b sources.Book) string {
+	shelves, _ := e.st.ShelvesOf(ctx, b.Source, b.ExternalID)
+	in := map[string]bool{}
+	for _, sh := range shelves {
+		in[sh] = true
+	}
+	for _, cs := range e.cfg.Shelves {
+		if in[cs] {
+			if f, ok := e.st.ShelfFormat(ctx, cs); ok {
+				return f
+			}
+		}
+	}
+	return e.cfg.Format
+}
+
 func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 	ok, err := e.st.AcquireRun(ctx)
 	if err != nil {
@@ -58,7 +76,11 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 	}
 	defer e.st.ReleaseRun(ctx)
 	var rep Report
-	books, err := e.src.Fetch(ctx, e.cfg.Shelves)
+	shelves, err := e.st.EnabledShelves(ctx, e.cfg.Shelves)
+	if err != nil {
+		return rep, err
+	}
+	books, err := e.src.Fetch(ctx, shelves)
 	if err != nil {
 		return rep, err
 	}
@@ -111,7 +133,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		}
 		id, exists, err := e.sh.CreateRequest(ctx, shelfarr.CreateRequestParams{
 			WorkID:    pick.WorkID,
-			BookTypes: []string{e.cfg.Format},
+			BookTypes: []string{e.formatFor(ctx, b)},
 			Language:  lang,
 			Title:     b.Title,
 			Author:    b.Author,
@@ -181,7 +203,7 @@ func (e *Engine) resolveAndRequest(ctx context.Context, b sources.Book) (string,
 		return "", err
 	}
 	id, exists, err := e.sh.CreateRequest(ctx, shelfarr.CreateRequestParams{
-		WorkID: pick.WorkID, BookTypes: []string{e.cfg.Format}, Language: lang,
+		WorkID: pick.WorkID, BookTypes: []string{e.formatFor(ctx, b)}, Language: lang,
 		Title: b.Title, Author: b.Author, CoverURL: pick.CoverURL, Year: pick.Year,
 	})
 	if err != nil {

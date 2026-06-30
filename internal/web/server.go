@@ -100,6 +100,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/actions/sync", s.guard(s.handleSync))
 	mux.HandleFunc("/queue", s.guard(s.handleQueue))
 	mux.HandleFunc("/review", s.guard(s.handleReview))
+	mux.HandleFunc("/shelves", s.guard(s.handleShelves))
 	mux.HandleFunc("/", s.guard(s.handleDashboard))
 	return securityHeaders(mux)
 }

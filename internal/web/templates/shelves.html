@@ -1,0 +1,11 @@
+{{define "content"}}<h1>Shelves</h1>
+<p class="muted">Configured shelves come from <a href="/settings">Settings → Shelves</a>. Per-shelf format overrides the global format; blank = use global.</p>
+{{range .Shelves}}
+<form method="post" action="/shelves" style="border:1px solid #333;border-radius:8px;padding:.8rem 1rem;margin-bottom:.8rem">
+<input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="shelf" value="{{.Shelf}}">
+<strong>{{.Shelf}}</strong>
+<label><input type="checkbox" name="enabled_{{.Shelf}}" value="1" {{if .Enabled}}checked{{end}} style="width:auto"> Enabled</label>
+<label>Format override (blank/ebook/audiobook)</label><input name="format_{{.Shelf}}" value="{{.Format}}">
+<label>Language override (blank/es/en)</label><input name="language_{{.Shelf}}" value="{{.Language}}">
+<button type="submit">Save shelf</button></form>
+{{else}}<p class="muted">No shelves configured.</p>{{end}}{{end}}

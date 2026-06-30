@@ -17,6 +17,16 @@ type Engine struct {
 	sh       *shelfarr.Client
 	cfg      config.Config
 	detector LanguageDetector
+	logf     func(string, ...any)
+}
+
+// SetLogf attaches a logger so the run narrates what it's doing (per book + phase).
+func (e *Engine) SetLogf(fn func(string, ...any)) { e.logf = fn }
+
+func (e *Engine) log(format string, a ...any) {
+	if e.logf != nil {
+		e.logf(format, a...)
+	}
 }
 
 type Report struct {
@@ -72,25 +82,31 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		return Report{}, err
 	}
 	if !ok {
+		e.log("a sync run is already in progress — skipping this trigger")
 		return Report{}, ErrRunInProgress
 	}
 	defer e.st.ReleaseRun(ctx)
+	e.log("sync started (dryRun=%v)", dryRun)
 	var rep Report
 	shelves, err := e.st.ShelvesToSync(ctx, e.cfg.Shelves)
 	if err != nil {
 		return rep, err
 	}
+	e.log("reading source for shelves %v", shelves)
 	books, err := e.src.Fetch(ctx, shelves)
 	if err != nil {
+		e.log("fetch error: %v", err)
 		return rep, err
 	}
 	rep.Fetched = len(books)
+	e.log("fetched %d book(s) from source", len(books))
 
 	newBooks, err := e.st.Diff(ctx, books)
 	if err != nil {
 		return rep, err
 	}
 	rep.New = len(newBooks)
+	e.log("%d new book(s) recorded", len(newBooks))
 
 	// Request from the pending 'new' pool (not just freshly-diffed books) so a
 	// backlog larger than one run's quota drains across successive runs.
@@ -99,15 +115,18 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		return rep, err
 	}
 	_ = e.st.BeginProgress(ctx, len(pending))
+	e.log("requesting up to %d book(s) this run", len(pending))
 	stopped := false
 	for i, b := range pending {
 		if e.st.StopRequested(ctx) { // cooperative cancel between books
+			e.log("stop requested — halting after %d/%d book(s)", i, len(pending))
 			stopped = true
 			break
 		}
 		// Surface live progress so the GUI can show "Processing 12/121 …" with the
 		// current title and running counters as the request phase advances.
 		_ = e.st.SetProgress(ctx, i, b.Title, rep.Requested, rep.NotFound, rep.Errors)
+		e.log("[%d/%d] %q by %s", i+1, len(pending), b.Title, b.Author)
 		// Query by clean title+author, not ISBN: a Goodreads ISBN often resolves
 		// to a different-language edition/work in the metadata providers (e.g. a
 		// Spanish ISBN -> the English original), which then fails title matching.
@@ -115,6 +134,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		results, err := e.sh.Search(ctx, q, 10)
 		if err != nil {
 			// per-item isolation: one slow/failed search must not abort the run.
+			e.log("    Shelfarr search failed: %v", err)
 			rep.Errors++
 			if !dryRun {
 				_ = e.st.SetState(ctx, b, "not_found") // routes into bounded recheck
@@ -124,6 +144,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		}
 		pick, _ := resolver.Resolve(b, results, e.cfg.SimilarityThreshold)
 		if pick == nil {
+			e.log("    no match above threshold among %d result(s) — not found", len(results))
 			rep.NotFound++
 			if !dryRun {
 				_ = e.st.SetState(ctx, b, "not_found")
@@ -131,6 +152,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 			continue
 		}
 		if dryRun {
+			e.log("    would request (work %s)", pick.WorkID)
 			continue // nothing sent; dry-run requests nothing
 		}
 		lang := e.detectLang(b)
@@ -151,22 +173,27 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 		})
 		if err != nil {
 			// per-item isolation: a failed POST must not abort the rest of the run.
+			e.log("    Shelfarr request failed: %v", err)
 			rep.Errors++
 			_ = e.st.SetState(ctx, b, "not_found")
 			_, _ = e.st.IncAttempt(ctx, b.Source, b.ExternalID)
 			continue
 		}
 		if exists {
+			e.log("    already requested in Shelfarr")
 			rep.AlreadyExists++
 		} else {
+			e.log("    requested ✓")
 			rep.Requested++
 		}
 		_ = e.st.SetRequested(ctx, b, pick.WorkID, id)
 	}
 	_ = e.st.SetProgress(ctx, len(pending), "", rep.Requested, rep.NotFound, rep.Errors)
 	if stopped {
+		e.log("stopped: requested=%d not_found=%d errors=%d", rep.Requested, rep.NotFound, rep.Errors)
 		return rep, nil // user asked to stop; skip recheck/reconcile
 	}
+	e.log("request phase done: requested=%d not_found=%d already=%d errors=%d", rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors)
 	if !dryRun {
 		if err := e.recheckPhase(ctx, &rep); err != nil {
 			return rep, err

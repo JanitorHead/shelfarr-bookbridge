@@ -35,6 +35,11 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	// A fresh process means no sync can be in flight: clear any run lock left
+	// behind by a crash or a container restart mid-run (otherwise every new run
+	// fails with "a sync run is already in progress" and the dashboard is stuck
+	// showing a phantom "Running").
+	_, _ = db.Exec(`UPDATE run_state SET running=0, started_at=NULL, stop_requested=0 WHERE id=1`)
 	return s, nil
 }
 

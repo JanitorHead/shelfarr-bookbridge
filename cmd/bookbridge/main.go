@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -84,6 +85,7 @@ func engineFor(cfg config.Config, st *store.Store, getenv func(string) string) (
 	if cfg.LangInference {
 		e.SetDetector(langdetect.New())
 	}
+	e.SetLogf(func(format string, a ...any) { fmt.Fprintf(os.Stdout, "[sync] "+format+"\n", a...) })
 	return e, nil
 }
 
@@ -137,6 +139,11 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 		mode = "dry-run"
 	}
 	rep, runErr := e.Run(context.Background(), dryRun)
+	if errors.Is(runErr, engine.ErrRunInProgress) {
+		// Collided with an already-running sync — nothing happened, don't pollute
+		// the run history with a bogus "error" entry.
+		return rep, runErr
+	}
 	rec := store.RunRecord{
 		StartedAt: start, FinishedAt: time.Now(), Mode: mode, OK: runErr == nil,
 		Fetched: rep.Fetched, New: rep.New, Requested: rep.Requested, NotFound: rep.NotFound,

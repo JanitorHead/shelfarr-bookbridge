@@ -1,6 +1,6 @@
 {{define "content"}}<h1>Review — not found / parked</h1>
 <table><thead><tr><th>Title</th><th>Author</th><th>State</th><th>Att.</th><th>Actions</th></tr></thead><tbody>
 {{range .Rows}}<tr><td>{{.Title}}</td><td>{{.Author}}</td><td>{{.State}}</td><td>{{.AttemptCount}}</td>
-<td><form method="post" action="/review" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="source" value="{{.Source}}"><input type="hidden" name="external_id" value="{{.ExternalID}}"><button name="action" value="retry">Retry</button> <button name="action" value="ignore" style="background:#555">Ignore</button></form></td></tr>
+<td><form method="post" action="/review" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="source" value="{{.Source}}"><input type="hidden" name="external_id" value="{{.ExternalID}}"><button name="action" value="retry">Retry</button> <button name="action" value="ignore" class="btn-secondary">Ignore</button></form></td></tr>
 {{else}}<tr><td colspan="5" class="muted">Nothing to review 🎉</td></tr>{{end}}
 </tbody></table>{{end}}

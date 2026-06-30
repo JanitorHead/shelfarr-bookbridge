@@ -1,7 +1,7 @@
 {{define "content"}}<h1>Dashboard</h1>
-{{if .NeedsAuth}}<div class="flash" style="background:#4a3d2d;border-color:#a83">No Goodreads cookie/feed key set — add one in <a href="/settings">Settings</a>.</div>{{end}}
+{{if .NeedsAuth}}<div class="banner banner-warn">No Goodreads cookie/feed key set — add one in <a href="/settings">Settings</a>.</div>{{end}}
 <div class="cards">{{range .Cells}}<div class="card"><div class="n">{{.N}}</div><div class="muted">{{.Name}}</div></div>{{else}}<p class="muted">No books yet — run a sync.</p>{{end}}</div>
 <h2>Actions</h2>
 <form method="post" action="/actions/sync" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="apply"><button>Sync now</button></form>
-<form method="post" action="/actions/sync" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button style="background:#555">Dry run</button></form>
+<form method="post" action="/actions/sync" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="mode" value="dryrun"><button class="btn-secondary">Dry run</button></form>
 {{if .LastRun}}<h2>Last run</h2><pre class="muted">{{.LastRun}}</pre>{{end}}{{end}}

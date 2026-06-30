@@ -56,6 +56,27 @@ func (e *Engine) detectLang(b sources.Book) string {
 	return ""
 }
 
+// languageFor decides the request language for a book. A per-shelf language
+// override is AUTHORITATIVE — it wins over title inference — so a Spanish reader
+// can force the Spanish edition of a book that Goodreads holds under its English
+// title (e.g. Cajal's "Los tónicos de la voluntad" shelved as "Advice for a
+// Young Investigator"). Without an override, fall back to title inference.
+func (e *Engine) languageFor(ctx context.Context, b sources.Book) string {
+	shelves, _ := e.st.ShelvesOf(ctx, b.Source, b.ExternalID)
+	in := map[string]bool{}
+	for _, sh := range shelves {
+		in[sh] = true
+	}
+	for _, cs := range e.cfg.Shelves {
+		if in[cs] {
+			if l, ok := e.st.ShelfLanguage(ctx, cs); ok {
+				return l
+			}
+		}
+	}
+	return e.detectLang(b)
+}
+
 var ErrRunInProgress = errors.New("a sync run is already in progress")
 
 // formatFor picks the request format from the highest-priority shelf override
@@ -168,7 +189,7 @@ func (e *Engine) Run(ctx context.Context, dryRun bool) (Report, error) {
 			e.log("    would request (work %s)", pick.WorkID)
 			continue // nothing sent; dry-run requests nothing
 		}
-		lang := e.detectLang(b)
+		lang := e.languageFor(ctx, b)
 		if lang != "" {
 			_ = e.st.SetChosenLanguage(ctx, b, lang)
 		}
@@ -248,7 +269,7 @@ func (e *Engine) resolveAndRequest(ctx context.Context, b sources.Book) (string,
 	if pick == nil {
 		return "not_found", nil
 	}
-	lang := e.detectLang(b)
+	lang := e.languageFor(ctx, b)
 	if lang != "" {
 		_ = e.st.SetChosenLanguage(ctx, b, lang)
 	}

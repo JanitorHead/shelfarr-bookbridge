@@ -131,3 +131,15 @@ func (s *Store) ShelfFormat(ctx context.Context, shelf string) (string, bool) {
 	}
 	return *f, true
 }
+
+// ShelfLanguage returns a shelf's configured language override (ok=false if none).
+func (s *Store) ShelfLanguage(ctx context.Context, shelf string) (string, bool) {
+	var l *string
+	if err := s.db.QueryRowContext(ctx, `SELECT language FROM shelf_config WHERE shelf=?`, shelf).Scan(&l); err != nil {
+		return "", false
+	}
+	if l == nil || *l == "" {
+		return "", false
+	}
+	return *l, true
+}

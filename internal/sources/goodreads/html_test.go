@@ -12,6 +12,8 @@ const sampleHTML = `<html><head><title>Rafa's books</title></head><body>
  <td class="field date_started"><div class="value"><div class="editable_date"><span class="date_started_value">Jan 05, 2024</span></div></div></td>
  <td class="field date_read"><div class="value"><div class="date_row"><span class="date_read_value">Feb 20, 2024</span><span class="date_read_value">Jan 01, 2020</span></div></div></td>
  <td class="field date_added"><div class="value"><span title="December 01, 2023"> Dec 01, 2023 </span></div></td>
+ <td class="field review"><div class="value"><span id="freeTextContainerreview99">Short.</span><span id="freeTextreview99" style="display:none">Great book.<br/><br/>Loved it.</span></div></td>
+ <td class="field notes"><div class="value">Read the sequel next <a href="#">[edit]</a></div></td>
 </tr>
 <tr id="review_2">
  <td class="field title"><div class="value"><a href="/book/show/67890.The_Wise_Mans_Fear" title="The Wise Man's Fear">The Wise Man&#39;s Fear</a></div></td>
@@ -47,6 +49,12 @@ func TestParseHTMLList(t *testing.T) {
 	}
 	if books[0].UserRating != 4 {
 		t.Fatalf("rating: got %d want 4 (from div.stars data-rating)", books[0].UserRating)
+	}
+	if books[0].Review != "Great book.\n\nLoved it." { // full hidden span, <br> → newlines
+		t.Fatalf("review: got %q", books[0].Review)
+	}
+	if books[0].Notes != "Read the sequel next" { // [edit] link stripped
+		t.Fatalf("notes: got %q", books[0].Notes)
 	}
 	if got := books[0].StartedAt.Format("2006-01-02"); got != "2024-01-05" {
 		t.Fatalf("started_at: got %q", got)

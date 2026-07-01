@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 12
+const schemaVersion = 13
 
 type Store struct{ db *sql.DB }
 
@@ -119,6 +119,9 @@ ALTER TABLE books ADD COLUMN progress_label TEXT NOT NULL DEFAULT '';`,
 		// matching the catalog against CWA's listbooks; calibre_id is the match.
 		`ALTER TABLE books ADD COLUMN owned_in_cwa INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE books ADD COLUMN calibre_id INTEGER NOT NULL DEFAULT 0;`,
+		// v13: your own review text + private notes from Goodreads.
+		`ALTER TABLE books ADD COLUMN review TEXT NOT NULL DEFAULT '';
+ALTER TABLE books ADD COLUMN private_notes TEXT NOT NULL DEFAULT '';`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

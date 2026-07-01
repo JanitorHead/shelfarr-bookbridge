@@ -52,12 +52,15 @@ func (s *Store) Diff(ctx context.Context, books []sources.Book) ([]sources.Book,
 			  read_at        = CASE WHEN ?<>'' THEN ? ELSE read_at END,
 			  started_at     = CASE WHEN ?<>'' THEN ? ELSE started_at END,
 			  progress_pct   = CASE WHEN ?<>0  THEN ? ELSE progress_pct END,
-			  progress_label = CASE WHEN ?<>'' THEN ? ELSE progress_label END
+			  progress_label = CASE WHEN ?<>'' THEN ? ELSE progress_label END,
+			  review         = CASE WHEN ?<>'' THEN ? ELSE review END,
+			  private_notes  = CASE WHEN ?<>'' THEN ? ELSE private_notes END
 			  WHERE source=? AND external_id=?`,
 				b.CoverURL, b.CoverURL, b.Description, b.Description, b.Year, b.Year,
 				b.UserRating, b.UserRating, b.AverageRating, b.AverageRating,
 				addedAt, addedAt, readAt, readAt,
 				fmtTime(b.StartedAt), fmtTime(b.StartedAt), b.ProgressPct, b.ProgressPct, b.ProgressLabel, b.ProgressLabel,
+				b.Review, b.Review, b.Notes, b.Notes,
 				b.Source, b.ExternalID); err != nil {
 				return nil, err
 			}
@@ -67,11 +70,11 @@ func (s *Store) Diff(ctx context.Context, books []sources.Book) ([]sources.Book,
 		// download-trigger shelf get promoted to 'new' (see PromoteDownloadable),
 		// so ingesting the whole library never floods Shelfarr with read books.
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state,description,user_rating,average_rating,read_at,started_at,progress_pct,progress_label)
-			 VALUES(?,?,?,?,?,?,?,?, 'catalog', ?,?,?,?,?,?,?)`,
+			`INSERT INTO books(source,external_id,title,author,isbn10,year,cover_url,added_at,state,description,user_rating,average_rating,read_at,started_at,progress_pct,progress_label,review,private_notes)
+			 VALUES(?,?,?,?,?,?,?,?, 'catalog', ?,?,?,?,?,?,?,?,?)`,
 			b.Source, b.ExternalID, b.Title, b.Author, b.ISBN10, b.Year, b.CoverURL, addedAt,
 			b.Description, b.UserRating, b.AverageRating, readAt,
-			fmtTime(b.StartedAt), b.ProgressPct, b.ProgressLabel); err != nil {
+			fmtTime(b.StartedAt), b.ProgressPct, b.ProgressLabel, b.Review, b.Notes); err != nil {
 			return nil, err
 		}
 		out = append(out, b)

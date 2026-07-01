@@ -2,6 +2,7 @@ package goodreads
 
 import (
 	"bytes"
+	"html"
 	"regexp"
 	"strconv"
 	"strings"
@@ -89,6 +90,38 @@ func htmlUserRating(row *goquery.Selection) int {
 	return n
 }
 
+var brRe = regexp.MustCompile(`(?i)<br\s*/?>`)
+var tagRe = regexp.MustCompile(`<[^>]+>`)
+
+// reviewText reads the user's full review from a review cell. Goodreads puts the
+// full text in a hidden span#freeTextreview<id> (the visible span#freeTextContainer…
+// is truncated); <br> become newlines. Empty for "Write a review".
+func reviewText(row *goquery.Selection) string {
+	cell := row.Find("td.field.review div.value")
+	sel := cell.Find(`span[id^="freeTextreview"]`)
+	if sel.Length() == 0 {
+		sel = cell.Find(`span[id^="freeTextContainerreview"]`)
+	}
+	if sel.Length() == 0 {
+		return ""
+	}
+	h, _ := sel.First().Html()
+	h = brRe.ReplaceAllString(h, "\n")
+	txt := html.UnescapeString(tagRe.ReplaceAllString(h, ""))
+	return strings.TrimSpace(txt)
+}
+
+// notesText reads the user's private notes from a notes cell ("None" → empty).
+func notesText(row *goquery.Selection) string {
+	cell := row.Find("td.field.notes div.value").Clone()
+	cell.Find("a").Remove() // drop the "[edit]" link
+	t := strings.TrimSpace(cell.Text())
+	if t == "" || strings.EqualFold(t, "None") {
+		return ""
+	}
+	return t
+}
+
 // parseHTMLList parses a Goodreads review/list table page. signedOut is true
 // when the page is the login wall (so the caller can surface ErrCookieExpired).
 func parseHTMLList(data []byte, shelf string) ([]sources.Book, bool, error) {
@@ -127,6 +160,8 @@ func parseHTMLList(data []byte, shelf string) ([]sources.Book, bool, error) {
 			AddedAt:       dateCell(row, "date_added"),
 			StartedAt:     dateCell(row, "date_started"),
 			ReadAt:        dateCell(row, "date_read"),
+			Review:        reviewText(row),
+			Notes:         notesText(row),
 		})
 	})
 	return out, false, nil

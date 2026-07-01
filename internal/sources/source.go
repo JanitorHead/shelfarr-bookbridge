@@ -25,6 +25,8 @@ type Book struct {
 	StartedAt     time.Time
 	ProgressPct   int    // 0–100 reading progress, when known (Hardcover / GR HTML)
 	ProgressLabel string // e.g. "page 45 of 300"
+	Review        string // the user's own review text
+	Notes         string // the user's private notes
 }
 
 // Source fetches books from the enabled shelves.

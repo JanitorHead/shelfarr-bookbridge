@@ -23,7 +23,9 @@
 {{if .B.ISBN10}}<div><dt>ISBN</dt><dd>{{.B.ISBN10}}</dd></div>{{end}}
 <div><dt>Download</dt><dd>{{stateLabel .B.State}}</dd></div>
 </dl>
-{{with .B.Description}}<div class="bd-desc">{{.}}</div>{{end}}
+{{with .B.Review}}<div class="bd-block"><div class="bd-block-h">Your review</div><div class="bd-usertext">{{.}}</div></div>{{end}}
+{{with .B.Notes}}<div class="bd-block"><div class="bd-block-h">Private notes</div><div class="bd-usertext">{{.}}</div></div>{{end}}
+{{with .B.Description}}<div class="bd-block"><div class="bd-block-h">Description</div><div class="bd-desc">{{.}}</div></div>{{end}}
 <div class="bd-actions">
 {{if or (eq .B.State "not_found") (eq .B.State "parked")}}
 <form method="post" action="/review" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="source" value="{{.B.Source}}"><input type="hidden" name="external_id" value="{{.B.ExternalID}}"><button name="action" value="retry" class="btn">Retry download</button> <button name="action" value="ignore" class="btn btn-secondary">Ignore</button></form>

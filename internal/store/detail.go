@@ -13,6 +13,8 @@ type BookDetail struct {
 	Description string
 	Year        int
 	ISBN10      string
+	Review      string
+	Notes       string
 }
 
 // ErrNotFound is returned when a book id doesn't exist.
@@ -23,12 +25,13 @@ func (s *Store) BookDetail(ctx context.Context, source, externalID string) (*Boo
 	var d BookDetail
 	var shelvesCSV string
 	err := s.db.QueryRowContext(ctx, `SELECT `+bookCols+`,
-	    COALESCE(b.description,''), COALESCE(b.year,0), COALESCE(b.isbn10,'')
+	    COALESCE(b.description,''), COALESCE(b.year,0), COALESCE(b.isbn10,''),
+	    COALESCE(b.review,''), COALESCE(b.private_notes,'')
 	  FROM books b WHERE b.source=? AND b.external_id=?`, source, externalID).Scan(
 		&d.Source, &d.ExternalID, &d.Title, &d.Author, &d.State, &d.WorkID, &d.RequestID, &d.Language,
 		&d.AttemptCount, &d.CoverURL, &d.UserRating, &d.AverageRating, &d.AddedAt, &d.ReadingStatus,
 		&d.StartedAt, &d.ReadAt, &d.ProgressPct, &d.ProgressLabel, &d.OwnedInCWA, &d.CalibreID, &shelvesCSV,
-		&d.Description, &d.Year, &d.ISBN10)
+		&d.Description, &d.Year, &d.ISBN10, &d.Review, &d.Notes)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}

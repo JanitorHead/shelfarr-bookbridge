@@ -48,6 +48,45 @@
     }
   }
 
+  // ── Book detail drawer ──────────────────────────────────────────────
+  // Clicking a book (grid card / list row) slides in a detail panel fetched
+  // from /book/<source>/<id>?drawer=1. No-JS fallback: the same link renders a
+  // full page. CSP-safe (external script, no inline handlers).
+  var drawer;
+  function ensureDrawer() {
+    if (drawer) return drawer;
+    drawer = document.createElement("div");
+    drawer.className = "bb-drawer";
+    drawer.innerHTML =
+      '<div class="bb-backdrop" data-drawer-close></div>' +
+      '<aside class="bb-panel"><button class="bb-close" data-drawer-close aria-label="Close">✕</button>' +
+      '<div class="bb-panel-body"></div></aside>';
+    document.body.appendChild(drawer);
+    return drawer;
+  }
+  function openDrawer(href) {
+    var d = ensureDrawer();
+    var body = d.querySelector(".bb-panel-body");
+    body.innerHTML = '<p class="muted drawer-msg">Loading…</p>';
+    d.classList.add("open");
+    document.body.classList.add("bb-noscroll");
+    fetch(href + (href.indexOf("?") < 0 ? "?" : "&") + "drawer=1", { headers: { "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) { if (html !== null) body.innerHTML = html; })
+      .catch(function () { body.innerHTML = '<p class="muted drawer-msg">Couldn’t load this book.</p>'; });
+  }
+  function closeDrawer() {
+    if (!drawer) return;
+    drawer.classList.remove("open");
+    document.body.classList.remove("bb-noscroll");
+  }
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest ? e.target.closest("[data-book]") : null;
+    if (link) { e.preventDefault(); openDrawer(link.getAttribute("href")); return; }
+    if (e.target.closest && e.target.closest("[data-drawer-close]")) { closeDrawer(); }
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
   function init() {
     var forms = document.querySelectorAll("[data-sync-form]");
 

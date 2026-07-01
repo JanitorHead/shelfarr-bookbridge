@@ -1,0 +1,34 @@
+{{define "content"}}<div class="detail-page">{{template "bookdetail" .}}</div>{{end}}
+
+{{define "bookdetail"}}<article class="bd">
+<div class="bd-head">
+<div class="bd-cover">{{if .B.CoverURL}}<img src="{{.B.CoverURL}}" alt="">{{else}}<span class="cover-ph">{{initials .B.Title}}</span>{{end}}</div>
+<div class="bd-headmain">
+<h2 class="bd-title">{{.B.Title}}</h2>
+<div class="bd-author">{{.B.Author}}{{if .B.Year}} · {{.B.Year}}{{end}}</div>
+<div class="bd-badges">
+{{if .B.ReadingStatus}}<span class="status status-{{.B.ReadingStatus}}">{{readingLabel .B.ReadingStatus}}</span>{{end}}
+<span class="own own-badge-{{.Own}}">{{ownLabel .Own}}</span>
+{{if .B.UserRating}}<span class="rating" title="your rating">{{stars .B.UserRating}}</span>{{else if .B.AverageRating}}<span class="rating muted" title="community average">{{printf "%.1f" .B.AverageRating}}★</span>{{end}}
+{{if .B.Language}}<span class="muted lang">{{.B.Language}}</span>{{end}}
+</div>
+{{if .B.ProgressPct}}<div class="bk-progress"><progress value="{{.B.ProgressPct}}" max="100"></progress><span class="muted small">{{.B.ProgressPct}}%{{with .B.ProgressLabel}} · {{.}}{{end}}</span></div>{{end}}
+</div>
+</div>
+{{if .Topics}}<div class="bd-tags">{{range .Topics}}<span class="tag">{{.}}</span>{{end}}</div>{{end}}
+<dl class="bd-facts">
+{{with dateOnly .B.AddedAt}}<div><dt>Added</dt><dd>{{.}}</dd></div>{{end}}
+{{with dateOnly .B.StartedAt}}<div><dt>Started</dt><dd>{{.}}</dd></div>{{end}}
+{{with dateOnly .B.ReadAt}}<div><dt>Finished</dt><dd>{{.}}</dd></div>{{end}}
+{{if .B.ISBN10}}<div><dt>ISBN</dt><dd>{{.B.ISBN10}}</dd></div>{{end}}
+<div><dt>Download</dt><dd>{{stateLabel .B.State}}</dd></div>
+</dl>
+{{with .B.Description}}<div class="bd-desc">{{.}}</div>{{end}}
+<div class="bd-actions">
+{{if or (eq .B.State "not_found") (eq .B.State "parked")}}
+<form method="post" action="/review" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="source" value="{{.B.Source}}"><input type="hidden" name="external_id" value="{{.B.ExternalID}}"><button name="action" value="retry" class="btn">Retry download</button> <button name="action" value="ignore" class="btn btn-secondary">Ignore</button></form>
+{{end}}
+{{if .GoodreadsURL}}<a class="btn btn-secondary" href="{{.GoodreadsURL}}" target="_blank" rel="noopener">Goodreads ↗</a>{{end}}
+{{if .CalibreURL}}<a class="btn btn-secondary" href="{{.CalibreURL}}" target="_blank" rel="noopener">Open in Calibre ↗</a>{{end}}
+</div>
+</article>{{end}}

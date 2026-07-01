@@ -136,6 +136,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/actions/stop", s.guard(s.handleStop))
 	mux.HandleFunc("/actions/status", s.guard(s.handleStatus))
 	mux.HandleFunc("/activity", s.guard(s.handleActivity))
+	mux.HandleFunc("/book/", s.guard(s.handleBook))
 	mux.HandleFunc("/review", s.guard(s.handleReview))
 	mux.HandleFunc("/shelves", s.guard(s.handleShelves))
 	mux.HandleFunc("/shelves/refresh", s.guard(s.handleShelvesRefresh))

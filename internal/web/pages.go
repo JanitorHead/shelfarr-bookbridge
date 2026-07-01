@@ -131,6 +131,48 @@ func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleBook renders one book's detail. With ?drawer=1 it returns just the
+// partial (for the slide-in drawer, fetched by app.js); otherwise a full page
+// (the no-JS fallback). Path: /book/<source>/<externalID>.
+func (s *Server) handleBook(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path, "/book/")
+	parts := strings.SplitN(rest, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	source, id := parts[0], parts[1]
+	d, err := s.st.BookDetail(context.Background(), source, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	cfg := s.cfg()
+	goodreadsURL := ""
+	if source == "goodreads" {
+		goodreadsURL = "https://www.goodreads.com/book/show/" + id
+	}
+	calibreURL := ""
+	if d.OwnedInCWA && d.CalibreID > 0 && cfg.CWAURL != "" {
+		calibreURL = strings.TrimRight(cfg.CWAURL, "/") + "/book/" + itoa(d.CalibreID)
+	}
+	csrf := ""
+	if se := s.session(r); se != nil {
+		csrf = se.csrf
+	}
+	data := map[string]any{
+		"B": d, "Own": ownership(d.BookRow), "Topics": store.TopicTags(d.Shelves),
+		"GoodreadsURL": goodreadsURL, "CalibreURL": calibreURL, "CSRF": csrf,
+	}
+	if r.URL.Query().Get("drawer") != "" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		_ = s.tmpl.ExecuteTemplate(w, "bookdetail", data)
+		return
+	}
+	s.render(w, r, "detail", d.Title, data)
+}
+
 // handleRefreshOwnership re-runs the CWA ownership cross-reference on demand.
 func (s *Server) handleRefreshOwnership(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

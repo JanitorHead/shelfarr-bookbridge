@@ -1,13 +1,13 @@
-{{define "bookcard"}}{{$own := ownership .}}<div class="bcard own-{{$own}}">
+{{define "bookcard"}}{{$own := ownership .}}<a class="bcard own-{{$own}}" href="/book/{{.Source}}/{{.ExternalID}}" data-book>
 <div class="bcard-cover">{{if .CoverURL}}<img src="{{.CoverURL}}" alt="" loading="lazy">{{else}}<span class="cover-ph">{{initials .Title}}</span>{{end}}
 {{if .ReadingStatus}}<span class="bcard-status status status-{{.ReadingStatus}}">{{readingLabel .ReadingStatus}}</span>{{end}}
 {{if .ProgressPct}}<span class="bcard-prog"><progress value="{{.ProgressPct}}" max="100"></progress></span>{{end}}
 </div>
 <div class="bcard-title" title="{{.Title}}">{{.Title}}</div>
 <div class="bcard-meta">{{if .UserRating}}<span class="rating" title="your rating">{{stars .UserRating}}</span>{{else}}<span></span>{{end}}<span class="own own-badge-{{$own}}">{{ownLabel $own}}</span></div>
-</div>{{end}}
+</a>{{end}}
 
-{{define "bookrow"}}{{$own := ownership .}}<div class="book own-{{$own}}">
+{{define "bookrow"}}{{$own := ownership .}}<a class="book own-{{$own}}" href="/book/{{.Source}}/{{.ExternalID}}" data-book>
 <div class="cover">{{if .CoverURL}}<img src="{{.CoverURL}}" alt="" loading="lazy">{{else}}<span class="cover-ph">{{initials .Title}}</span>{{end}}</div>
 <div class="bk-main"><div class="bk-title">{{.Title}}</div>
 <div class="bk-sub">{{.Author}}{{range topicTags .Shelves}} <span class="tag">{{.}}</span>{{end}}{{with dateOnly .ReadAt}} <span class="muted">· read {{.}}</span>{{else}}{{with dateOnly .AddedAt}} <span class="muted">· added {{.}}</span>{{end}}{{end}}</div>
@@ -18,4 +18,4 @@
 <span class="own own-badge-{{$own}}">{{ownLabel $own}}</span>
 {{if .Language}}<span class="muted lang">{{.Language}}</span>{{end}}
 </div>
-</div>{{end}}
+</a>{{end}}

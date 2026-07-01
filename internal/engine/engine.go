@@ -30,9 +30,9 @@ func (e *Engine) log(format string, a ...any) {
 }
 
 type Report struct {
-	Fetched, New, Requested, NotFound, AlreadyExists int
-	Reconciled, Completed, Failed, Rechecked, Parked int
-	Errors                                           int // per-item transient failures (timeouts, 5xx) — isolated, not fatal
+	Fetched, New, Requested, NotFound, AlreadyExists          int
+	Reconciled, Completed, Failed, Rechecked, Parked, Retried int
+	Errors                                                    int // per-item transient failures (timeouts, 5xx) — isolated, not fatal
 }
 
 func New(src sources.Source, st *store.Store, sh *shelfarr.Client, cfg config.Config) *Engine {
@@ -348,6 +348,23 @@ func (e *Engine) reconcilePhase(ctx context.Context, rep *Report) error {
 			// per-item isolation: a transient status-poll failure retries next run.
 			rep.Errors++
 			continue
+		}
+		// Auto-retry stuck requests (failed / flagged for attention): re-poke
+		// Shelfarr so a transient failure (dead torrent at grab time, download
+		// client hiccup) gets another go, up to the configured cap. It does NOT
+		// force a different release — Shelfarr's API can't (see issue upstream).
+		if (st.Status == "failed" || st.AttentionNeeded) && e.cfg.ShelfarrAutoRetry && ref.RequestID != "" {
+			if tries, _ := e.st.ShelfarrRetries(ctx, ref.Source, ref.ExternalID); tries < e.cfg.ShelfarrAutoRetryMax {
+				if err := e.sh.Retry(ctx, ref.RequestID); err == nil {
+					_ = e.st.IncShelfarrRetry(ctx, ref.Source, ref.ExternalID)
+					_ = e.st.ApplyStatus(ctx, ref.Source, ref.ExternalID, "searching")
+					e.log("    stuck (%s) — auto-retried in Shelfarr (%d/%d)", st.Status, tries+1, e.cfg.ShelfarrAutoRetryMax)
+					rep.Retried++
+					continue
+				} else {
+					e.log("    Shelfarr auto-retry failed: %v", err)
+				}
+			}
 		}
 		newState := statusToState(st.Status)
 		if err := e.st.ApplyStatus(ctx, ref.Source, ref.ExternalID, newState); err != nil {

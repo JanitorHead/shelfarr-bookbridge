@@ -310,3 +310,20 @@ func (s *Store) PendingNewItems(ctx context.Context, limit int) ([]sources.Book,
 	}
 	return out, rows.Err()
 }
+
+// ShelfarrRetries returns how many times a book's Shelfarr request has been auto-retried.
+func (s *Store) ShelfarrRetries(ctx context.Context, source, externalID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(shelfarr_retries,0) FROM books WHERE source=? AND external_id=?`,
+		source, externalID).Scan(&n)
+	return n, err
+}
+
+// IncShelfarrRetry bumps a book's Shelfarr auto-retry counter.
+func (s *Store) IncShelfarrRetry(ctx context.Context, source, externalID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE books SET shelfarr_retries = COALESCE(shelfarr_retries,0)+1, updated_at=datetime('now')
+		 WHERE source=? AND external_id=?`, source, externalID)
+	return err
+}

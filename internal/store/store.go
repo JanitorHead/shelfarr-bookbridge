@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 14
+const schemaVersion = 15
 
 type Store struct{ db *sql.DB }
 
@@ -127,6 +127,8 @@ ALTER TABLE books ADD COLUMN private_notes TEXT NOT NULL DEFAULT '';`,
   source TEXT NOT NULL, external_id TEXT NOT NULL, position INTEGER NOT NULL,
   location TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (source, external_id, position));`,
+		// v15: how many times we've auto-retried a stuck Shelfarr request.
+		`ALTER TABLE books ADD COLUMN shelfarr_retries INTEGER NOT NULL DEFAULT 0;`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {

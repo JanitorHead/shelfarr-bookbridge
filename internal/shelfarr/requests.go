@@ -65,3 +65,26 @@ func (c *Client) CreateRequest(ctx context.Context, p CreateRequestParams) (stri
 	id := strings.Trim(string(parsed.Requests[0].ID), `"`)
 	return id, false, nil
 }
+
+// Retry asks Shelfarr to retry a request (re-grab the selected release, or
+// restart the search). Note: Shelfarr does NOT blocklist the failed release, so
+// this un-sticks transient failures but does not force a different method.
+func (c *Client) Retry(ctx context.Context, id string) error {
+	req, err := c.newReq("POST", "/api/v1/requests/"+id+"/retry")
+	if err != nil {
+		return err
+	}
+	resp, err := c.hc.Do(req.WithContext(ctx))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == 404 {
+		return ErrRequestNotFound
+	}
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		return fmt.Errorf("shelfarr retry %s: HTTP %d: %s", id, resp.StatusCode, body)
+	}
+	return nil
+}

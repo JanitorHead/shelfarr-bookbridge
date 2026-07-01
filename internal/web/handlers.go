@@ -70,6 +70,9 @@ var settingsSections = []settingsSection{
 				Help: "baseline = mark existing books as seen; backfill = request them all."},
 			{Key: "LANG_INFERENCE", Label: "Infer language from the title", Kind: "checkbox", OnValue: "on", OffValue: "off",
 				Help: "A per-shelf language below overrides this."},
+			{Key: "SHELFARR_AUTORETRY", Label: "Auto-retry stuck requests", Kind: "checkbox", OnValue: "true", OffValue: "false",
+				Help: "Re-poke Shelfarr requests that failed or need attention (helps transient failures; does not change download method)."},
+			{Key: "SHELFARR_AUTORETRY_MAX", Label: "Max auto-retries per request", Kind: "number", Help: "Default 3."},
 		},
 	},
 	{
@@ -199,11 +202,13 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched sc
 		"FORMAT": cfg.Format, "MAX_REQUESTS_PER_RUN": itoa(cfg.MaxRequestsPerRun),
 		"SIMILARITY_THRESHOLD": ftoa(cfg.SimilarityThreshold), "FIRST_RUN": cfg.FirstRun,
 		"LANG_INFERENCE": onoff(cfg.LangInference), "SHELFARR_INSECURE": btoa(cfg.ShelfarrInsecure),
-		"GUI_PORT": cfg.GUIPort, "AUTH_METHOD": cfg.AuthMethod, "AUTH_REQUIRED": cfg.AuthRequired,
+		"SHELFARR_AUTORETRY_MAX": itoa(cfg.ShelfarrAutoRetryMax),
+		"GUI_PORT":               cfg.GUIPort, "AUTH_METHOD": cfg.AuthMethod, "AUTH_REQUIRED": cfg.AuthRequired,
 		"CWA_URL": cfg.CWAURL, "CWA_USERNAME": cfg.CWAUsername, "CWA_DATE_COLUMN": cfg.CWADateColumn,
 	}
 	checked := map[string]bool{
-		"LANG_INFERENCE": cfg.LangInference, "SHELFARR_INSECURE": cfg.ShelfarrInsecure, "CWA_ENABLED": cfg.CWAEnabled,
+		"LANG_INFERENCE": cfg.LangInference, "SHELFARR_INSECURE": cfg.ShelfarrInsecure,
+		"SHELFARR_AUTORETRY": cfg.ShelfarrAutoRetry, "CWA_ENABLED": cfg.CWAEnabled,
 	}
 	type vmField struct {
 		Key, Label, Kind, Value, Help string

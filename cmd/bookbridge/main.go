@@ -402,9 +402,9 @@ func mergeGRTags(existing, shelves []string) []string {
 }
 
 func reportLine(mode string, rep engine.Report) string {
-	return fmt.Sprintf("[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d",
+	return fmt.Sprintf("[%s] fetched=%d new=%d requested=%d not_found=%d already_exists=%d errors=%d reconciled=%d completed=%d failed=%d rechecked=%d parked=%d retried=%d",
 		mode, rep.Fetched, rep.New, rep.Requested, rep.NotFound, rep.AlreadyExists, rep.Errors,
-		rep.Reconciled, rep.Completed, rep.Failed, rep.Rechecked, rep.Parked)
+		rep.Reconciled, rep.Completed, rep.Failed, rep.Rechecked, rep.Parked, rep.Retried)
 }
 
 func printReport(out io.Writer, mode string, rep engine.Report) {

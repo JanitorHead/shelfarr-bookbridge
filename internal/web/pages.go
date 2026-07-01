@@ -207,12 +207,11 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 		case "retry":
 			s.st.RetryBook(ctx, src, id)
 		}
-		http.Redirect(w, r, "/review", http.StatusSeeOther)
+		http.Redirect(w, r, "/activity", http.StatusSeeOther)
 		return
 	}
-	nf, _ := s.st.ListBooks(ctx, "not_found", "", 500)
-	parked, _ := s.st.ListBooks(ctx, "parked", "", 500)
-	s.render(w, r, "review", "Review", map[string]any{"Rows": append(nf, parked...)})
+	// Review is merged into Activity; the GET just redirects there.
+	http.Redirect(w, r, "/activity", http.StatusMovedPermanently)
 }
 
 func (s *Server) handleShelves(w http.ResponseWriter, r *http.Request) {

@@ -267,14 +267,16 @@ func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
 	needsAuth := s.settingValue("GOODREADS_COOKIE") == "" && s.settingValue("GOODREADS_FEED_KEY") == ""
 	started := r.URL.Query().Get("started") != ""
 	stopping := r.URL.Query().Get("stopping") != ""
-	downloading, _ := s.st.ListBooks(ctx, "downloading", "", 8)
-	notFound, _ := s.st.ListBooks(ctx, "not_found", "", 8)
+	downloading, _ := s.st.ListBooks(ctx, "downloading", "", 12)
+	nf, _ := s.st.ListBooks(ctx, "not_found", "", 500)
+	parked, _ := s.st.ListBooks(ctx, "parked", "", 500)
+	attention := append(nf, parked...)
 	prog, _ := s.st.Progress(ctx)
 	s.render(w, r, "dashboard", "Activity", map[string]any{
 		"Cells": cells, "NeedsAuth": needsAuth, "Started": started, "Stopping": stopping,
 		"Running": running, "StartedAt": startedAt,
 		"Last": last, "HasLast": hasLast, "Recent": recent, "NextRun": next,
-		"Downloading": downloading, "NotFound": notFound,
+		"Downloading": downloading, "Attention": attention,
 		"TotalBooks": total(counts), "Prog": prog,
 	})
 }

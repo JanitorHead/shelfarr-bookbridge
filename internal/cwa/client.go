@@ -50,7 +50,10 @@ type Client struct {
 func New(base, user string, pass config.SecretString) *Client {
 	jar, _ := cookiejar.New(nil)
 	return &Client{
-		base: strings.TrimRight(base, "/"),
+		// TrimSpace: a pasted URL often carries a trailing newline; leaving it in
+		// makes http.NewRequest fail ("invalid control character in URL") and — if
+		// the error is ignored — a nil request panics http.Client.Do.
+		base: strings.TrimRight(strings.TrimSpace(base), "/"),
 		user: user, pass: pass,
 		hc: &http.Client{Jar: jar, Timeout: 25 * time.Second,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
@@ -58,7 +61,10 @@ func New(base, user string, pass config.SecretString) *Client {
 }
 
 func (c *Client) csrfFrom(ctx context.Context, path string) (string, error) {
-	req, _ := http.NewRequestWithContext(ctx, "GET", c.base+path, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.base+path, nil)
+	if err != nil {
+		return "", fmt.Errorf("bad CWA URL %q: %w", c.base, err)
+	}
 	resp, err := c.hc.Do(req)
 	if err != nil {
 		return "", err

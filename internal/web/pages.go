@@ -104,6 +104,22 @@ func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// View mode (grid | list), default grid, remembered in a cookie. When passed
+	// as ?view= it's persisted; otherwise read from the cookie.
+	view := r.URL.Query().Get("view")
+	if view == "grid" || view == "list" {
+		http.SetCookie(w, &http.Cookie{Name: "bb_view", Value: view, Path: "/", MaxAge: 31536000, SameSite: http.SameSiteLaxMode})
+	} else if c, err := r.Cookie("bb_view"); err == nil && (c.Value == "grid" || c.Value == "list") {
+		view = c.Value
+	} else {
+		view = "grid"
+	}
+	base := libHref(f)
+	sep := "?"
+	if strings.Contains(base, "?") {
+		sep = "&"
+	}
+
 	s.render(w, r, "queue", "Library", map[string]any{
 		"Rows": rows, "Shown": len(rows),
 		"Q": f.Q, "State": f.State, "Status": f.Status, "Tag": f.Tag, "Owned": f.Owned,
@@ -111,6 +127,7 @@ func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 		"HasTags": len(tagChips) > 0, "CWAOn": s.cfg().CWAConfigured(),
 		"OwnRefreshed": r.URL.Query().Get("owned_refreshed") != "",
 		"Err":          r.URL.Query().Get("err"),
+		"View":         view, "GridHref": base + sep + "view=grid", "ListHref": base + sep + "view=list",
 	})
 }
 

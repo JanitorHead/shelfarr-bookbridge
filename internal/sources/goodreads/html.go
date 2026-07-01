@@ -13,6 +13,19 @@ import (
 
 var bookIDRe = regexp.MustCompile(`/book/show/(\d+)`)
 
+// coverSrc reads a real cover URL from a Goodreads <img>, tolerating lazy-loaded
+// images (data-src / data-original) and ignoring the "nophoto" placeholder.
+func coverSrc(img *goquery.Selection) string {
+	for _, attr := range []string{"src", "data-src", "data-original"} {
+		v, ok := img.Attr(attr)
+		v = strings.TrimSpace(v)
+		if ok && v != "" && !strings.Contains(v, "nophoto") {
+			return v
+		}
+	}
+	return ""
+}
+
 // grHTMLDateLayouts are the display formats Goodreads renders date columns in
 // (print view), distinct from the RFC-style dates in RSS (grDateLayouts).
 var grHTMLDateLayouts = []string{"Jan 02, 2006", "Jan 2006", "2006/01/02", "Jan 02 2006"}
@@ -76,7 +89,7 @@ func parseHTMLList(data []byte, shelf string) ([]sources.Book, bool, error) {
 		title := strings.TrimSpace(row.Find("td.field.title div.value a").Text())
 		author := strings.TrimSpace(row.Find("td.field.author div.value a").Text())
 		isbn := strings.TrimSpace(row.Find("td.field.isbn div.value").Text())
-		cover, _ := row.Find("td.field.cover img").Attr("src")
+		cover := coverSrc(row.Find("td.field.cover img"))
 		avg, _ := strconv.ParseFloat(strings.TrimSpace(row.Find("td.field.avg_rating div.value").Text()), 64)
 		out = append(out, sources.Book{
 			Source:        "goodreads",

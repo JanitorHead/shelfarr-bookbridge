@@ -163,8 +163,15 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 		rec.ErrorText = runErr.Error()
 	}
 	_, _ = st.RecordRun(context.Background(), rec)
-	// After a successful real run, push Goodreads shelves into CWA as tags and
-	// refresh which catalog books are owned in Calibre (for the Library badges).
+	// After a successful real run, fill any missing covers (Open Library by ISBN)
+	// so the Library grid isn't full of placeholders.
+	if runErr == nil && !dryRun {
+		if n, _ := st.BackfillCovers(context.Background()); n > 0 {
+			fmt.Fprintf(os.Stdout, "[covers] filled %d cover(s) from Open Library\n", n)
+		}
+	}
+	// Then push Goodreads shelves into CWA as tags and refresh which catalog
+	// books are owned in Calibre (for the Library badges).
 	if runErr == nil && !dryRun && cfg.CWAConfigured() {
 		cwaTagPass(st, cfg, os.Stdout)
 		if err := refreshOwnership(st, cfg, os.Stdout); err != nil {

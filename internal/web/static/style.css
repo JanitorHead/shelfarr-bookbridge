@@ -217,6 +217,23 @@ a.bcard:hover .bcard-title{color:var(--link)}
 .progress progress::-moz-progress-bar{background:var(--active)}
 #progress-text{margin-top:.35rem}
 
+/* settings: grouped cards */
+.settings-form{margin-bottom:1.2rem}
+.set-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.3rem;margin:1rem 0;box-shadow:0 1px 4px var(--shadow)}
+.set-card-head{margin-bottom:.7rem}
+.set-card-head h2{margin:.1rem 0 .15rem;font-size:1.05rem;color:var(--text-strong)}
+.set-card-head p{margin:0;font-size:.85rem}
+.set-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem 1.4rem}
+.set-field{display:flex;flex-direction:column;min-width:0}
+.set-field.wide{grid-column:1/-1}
+.set-field.row{flex-direction:row;align-items:center;gap:.7rem;grid-column:1/-1}
+.set-field.row label:first-child{margin:0;flex:1}
+.set-field input,.set-field select,.set-field textarea{max-width:none}
+.set-field label{margin:.55rem 0 .25rem}
+.fhelp{margin:.25rem 0 .1rem;line-height:1.4}
+.set-field .set{color:var(--ok)}.set-field .unset{color:var(--muted)}
+@media(max-width:640px){.set-fields{grid-template-columns:1fr}}
+
 /* shelves toggles */
 .shelf-list{display:flex;flex-direction:column;gap:.5rem;margin:.6rem 0 1rem}
 .shelf-row{display:flex;align-items:center;gap:.8rem;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:.55rem .8rem}

@@ -1,14 +1,48 @@
-{{define "content"}}<h1>Settings</h1>
-<form method="post" action="/settings"><input type="hidden" name="csrf" value="{{.CSRF}}">
-{{range $f := .Fields}}<label>{{$f.Label}}</label>{{if eq $f.Kind "select"}}<select name="{{$f.Key}}">{{range $f.Options}}<option value="{{.}}" {{if eq . $f.Value}}selected{{end}}>{{optLabel .}}</option>{{end}}</select>{{else if eq $f.Kind "checkbox"}}<input type="checkbox" name="{{$f.Key}}" {{if $f.Checked}}checked{{end}}>{{else if eq $f.Kind "number"}}<input type="number" name="{{$f.Key}}" value="{{$f.Value}}">{{else}}<input name="{{$f.Key}}" value="{{$f.Value}}">{{end}}{{end}}
-<p class="muted"><b>private — session cookie</b> reads private or &gt;100-book shelves (recommended). <b>public — RSS feed</b> only works for public shelves (max 100). If your shelves are private, choose <b>private</b> and paste the cookie below.</p>
-<h2>Schedule</h2>{{with .Schedule}}{{if .Error}}<div class="banner banner-error">{{.Error}}</div>{{end}}<label>Run frequency</label><select name="SCHEDULE_PRESET">{{range .Presets}}<option value="{{.Value}}" {{if eq .Value $.Schedule.Preset}}selected{{end}}>{{.Label}}</option>{{end}}</select><label>Daily run time (for the daily preset)</label><input type="time" name="SCHEDULE_TIME" value="{{.Time}}"><label>Advanced cron (for the advanced preset)</label><input name="SCHEDULE_RAW" value="{{.Raw}}">{{if .Next}}<p class="muted">Next run: {{.Next}}</p>{{end}}<p class="muted">Schedule changes apply after the next container restart.</p>{{end}}
-<h2>Secrets <span class="muted">(leave blank to keep current)</span></h2>
-{{range .Secrets}}<label>{{.Label}} — {{if .Set}}<span class="set">set</span>{{else}}<span class="unset">not set</span>{{end}}</label>{{if eq .Key "GOODREADS_COOKIE"}}<textarea name="{{.Key}}" rows="3" placeholder="Paste the full Cookie header here…"></textarea>
-<details class="hint"><summary class="muted">Where do I get this cookie?</summary><ol class="muted small">
-<li>Open <b>goodreads.com</b> in your browser, logged in.</li>
-<li>Press <b>F12</b> → <b>Network</b> tab → reload the page.</li>
-<li>Click any request to <b>goodreads.com</b> → <b>Headers</b> → find <b>Request Headers → Cookie</b>.</li>
-<li>Copy the <b>entire</b> value and paste it above. It must include <code>_session_id2</code> <b>and</b> the Amazon login cookies <code>at-main</code>, <code>x-main</code>, <code>session-token</code> — a partial cookie gives a 401.</li>
-</ol></details>{{else}}<input name="{{.Key}}" type="password" placeholder="••••••••">{{end}}{{end}}
-<button type="submit">Save</button></form>{{end}}
+{{define "content"}}<div class="page-head"><h1>Settings</h1></div>
+{{if .Shelves.Saved}}<div class="banner banner-ok">Saved.</div>{{end}}
+<form method="post" action="/settings" class="settings-form"><input type="hidden" name="csrf" value="{{.CSRF}}">
+{{range .Sections}}<section class="set-card">
+<div class="set-card-head"><h2>{{.Title}}</h2><p class="muted">{{.Desc}}</p></div>
+{{if eq .Title "Schedule"}}{{with $.Schedule}}
+{{if .Error}}<div class="banner banner-error">{{.Error}}</div>{{end}}
+<div class="set-fields">
+<div class="set-field"><label>Run frequency</label><select name="SCHEDULE_PRESET">{{range .Presets}}<option value="{{.Value}}" {{if eq .Value $.Schedule.Preset}}selected{{end}}>{{.Label}}</option>{{end}}</select></div>
+<div class="set-field"><label>Daily run time</label><input type="time" name="SCHEDULE_TIME" value="{{.Time}}"></div>
+<div class="set-field wide"><label>Advanced cron</label><input name="SCHEDULE_RAW" value="{{.Raw}}"><div class="fhelp muted small">{{if .Next}}Next run: {{.Next}}. {{end}}Schedule changes apply after the next container restart.</div></div>
+</div>{{end}}
+{{else}}<div class="set-fields">
+{{range .Fields}}{{$f := .}}<div class="set-field{{if eq $f.Kind "textarea"}} wide{{end}}{{if eq $f.Kind "checkbox"}} row{{end}}">
+<label>{{$f.Label}}{{if $f.Secret}} <span class="small">{{if $f.Set}}<span class="set">set</span>{{else}}<span class="unset">not set</span>{{end}}</span>{{end}}</label>
+{{if eq $f.Kind "select"}}<select name="{{$f.Key}}">{{range $f.Options}}<option value="{{.}}" {{if eq . $f.Value}}selected{{end}}>{{optLabel .}}</option>{{end}}</select>
+{{else if eq $f.Kind "checkbox"}}<label class="switch"><input type="checkbox" name="{{$f.Key}}" {{if $f.Checked}}checked{{end}}><span class="slider"></span></label>
+{{else if eq $f.Kind "number"}}<input type="number" name="{{$f.Key}}" value="{{$f.Value}}">
+{{else if eq $f.Kind "textarea"}}<textarea name="{{$f.Key}}" rows="3" placeholder="Paste the full Cookie header here…"></textarea>
+{{else if eq $f.Kind "password"}}<input name="{{$f.Key}}" type="password" placeholder="••••••••">
+{{else}}<input name="{{$f.Key}}" value="{{$f.Value}}">{{end}}
+{{if $f.Help}}<div class="fhelp muted small">{{$f.Help}}</div>{{end}}
+{{if eq $f.Key "GOODREADS_COOKIE"}}<details class="hint"><summary class="muted small">Where do I get this cookie?</summary><ol class="muted small"><li>Open <b>goodreads.com</b> logged in.</li><li><b>F12</b> → Network → reload → click a goodreads.com request → Headers → Cookie.</li><li>Copy the <b>whole</b> value — it must include <code>_session_id2</code> and the Amazon <code>at-main</code>/<code>x-main</code>/<code>session-token</code>.</li></ol></details>{{end}}
+</div>{{end}}
+</div>{{end}}
+</section>{{end}}
+<button type="submit" class="btn">Save settings</button>
+</form>
+
+<section class="set-card" id="shelves">
+<div class="set-card-head"><h2>Shelves</h2><p class="muted">Your whole {{.Shelves.Source}} library shows in the <a href="/">Library</a> either way. A toggle marks a shelf as a <b>download trigger</b> (its books are requested in Shelfarr). Status shelves set reading status; the rest become topic tags.</p></div>
+{{with .Shelves}}
+{{if .Err}}<div class="banner banner-error">Couldn’t list shelves: {{.Err}}</div>{{end}}
+{{if .Refreshed}}<div class="banner banner-ok">Found {{.Refreshed}} shelves from {{.Source}}.</div>{{end}}
+<form method="post" action="/shelves/refresh" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn btn-secondary btn-sm">↻ Refresh from {{.Source}}</button></form>
+<form method="post" action="/shelves"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="shelves" value="{{.Slugs}}">
+<div class="shelf-list">
+{{range .Shelves}}<div class="shelf-row">
+<label class="switch"><input type="checkbox" name="enabled_{{.Shelf}}" value="1" {{if .Enabled}}checked{{end}}><span class="slider"></span></label>
+<div class="shelf-main"><div class="shelf-name">{{.Name}}</div>{{if .Count}}<div class="muted small">{{.Count}} books</div>{{end}}</div>
+<select name="format_{{.Shelf}}"><option value="" {{if eq .Format ""}}selected{{end}}>format: global</option><option value="ebook" {{if eq .Format "ebook"}}selected{{end}}>ebook</option><option value="audiobook" {{if eq .Format "audiobook"}}selected{{end}}>audiobook</option></select>
+<select name="language_{{.Shelf}}"><option value="" {{if eq .Language ""}}selected{{end}}>lang: global</option><option value="es" {{if eq .Language "es"}}selected{{end}}>es</option><option value="en" {{if eq .Language "en"}}selected{{end}}>en</option></select>
+</div>{{else}}<p class="muted empty">No shelves yet — set your source above and hit Refresh.</p>{{end}}
+</div>
+{{if .Shelves}}<button type="submit" class="btn">Save shelves</button>{{end}}
+</form>
+{{end}}
+</section>{{end}}

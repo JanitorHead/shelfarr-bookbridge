@@ -26,38 +26,82 @@ func onoff(b bool) string {
 	return "off"
 }
 
-// settingFields are the non-secret settings editable in the GUI (env-var keys).
-var settingFields = []struct {
-	Key, Label, Kind  string
-	Options           []string
-	OnValue, OffValue string
-}{
-	{Key: "SOURCE", Label: "Book source", Kind: "select", Options: []string{"goodreads", "hardcover"}},
-	{Key: "SHELFARR_URL", Label: "Shelfarr URL", Kind: "text"},
-	{Key: "GOODREADS_MODE", Label: "Goodreads source mode", Kind: "select", Options: []string{"", "private_cookie", "public_rss"}},
-	{Key: "GOODREADS_USER_ID", Label: "Goodreads user id", Kind: "text"},
-	{Key: "HARDCOVER_USERNAME", Label: "Hardcover username (optional)", Kind: "text"},
-	{Key: "FORMAT", Label: "Format (ebook/audiobook)", Kind: "select", Options: []string{"ebook", "audiobook"}},
-	{Key: "MAX_REQUESTS_PER_RUN", Label: "Max requests per run", Kind: "number"},
-	{Key: "SIMILARITY_THRESHOLD", Label: "Similarity threshold (0-1)", Kind: "number"},
-	{Key: "FIRST_RUN", Label: "First run (baseline/backfill)", Kind: "select", Options: []string{"baseline", "backfill"}},
-	{Key: "LANG_INFERENCE", Label: "Language inference (on/off)", Kind: "checkbox", OnValue: "on", OffValue: "off"},
-	{Key: "SHELFARR_INSECURE", Label: "Allow http to non-loopback Shelfarr (true/false)", Kind: "checkbox", OnValue: "true", OffValue: "false"},
-	{Key: "GUI_PORT", Label: "GUI port", Kind: "number"},
-	{Key: "AUTH_METHOD", Label: "Auth method (forms/none)", Kind: "select", Options: []string{"forms", "none"}},
-	{Key: "AUTH_REQUIRED", Label: "Auth required (enabled/local)", Kind: "select", Options: []string{"enabled", "local"}},
-	{Key: "CWA_ENABLED", Label: "Sync to Calibre-Web-Automated (topics→tags, reading lists→shelves, read→read flag, rating + date)", Kind: "checkbox", OnValue: "true", OffValue: "false"},
-	{Key: "CWA_URL", Label: "CWA URL (e.g. http://192.168.1.10:8083)", Kind: "text"},
-	{Key: "CWA_USERNAME", Label: "CWA username", Kind: "text"},
-	{Key: "CWA_DATE_COLUMN", Label: "CWA date custom-column id (optional, e.g. 1 — pushes Goodreads date added)", Kind: "text"},
+// setField is one editable setting. Secret fields are write-only (only saved
+// when non-blank) and render as password/textarea inputs with a set/not-set hint.
+type setField struct {
+	Key, Label, Kind, Help string
+	Options                []string
+	Secret                 bool
+	OnValue, OffValue      string // checkbox canonical values
 }
 
-var secretFields = []struct{ Key, Label string }{
-	{"SHELFARR_TOKEN", "Shelfarr API token"},
-	{"GOODREADS_COOKIE", "Goodreads session cookie"},
-	{"GOODREADS_FEED_KEY", "Goodreads RSS feed key"},
-	{"HARDCOVER_TOKEN", "Hardcover API token"},
-	{"CWA_PASSWORD", "CWA password"},
+// settingsSection groups related settings into one card. Fields live with the
+// thing they configure — notably each secret sits next to its own field (CWA
+// password after CWA username, Shelfarr token after the URL).
+type settingsSection struct {
+	Title, Desc string
+	Fields      []setField
+}
+
+var settingsSections = []settingsSection{
+	{
+		Title: "Library source", Desc: "Where BookBridge reads your books and reading data from.",
+		Fields: []setField{
+			{Key: "SOURCE", Label: "Book source", Kind: "select", Options: []string{"goodreads", "hardcover"}},
+			{Key: "GOODREADS_MODE", Label: "Goodreads mode", Kind: "select", Options: []string{"", "private_cookie", "public_rss"},
+				Help: "private (cookie) reads private / >100-book shelves and reading progress — recommended. public (RSS) only works for public shelves, max 100."},
+			{Key: "GOODREADS_USER_ID", Label: "Goodreads user ID", Kind: "text", Help: "The number in your Goodreads profile URL."},
+			{Key: "GOODREADS_COOKIE", Label: "Goodreads session cookie", Kind: "textarea", Secret: true},
+			{Key: "GOODREADS_FEED_KEY", Label: "Goodreads RSS feed key", Kind: "password", Secret: true, Help: "Only for public-RSS mode."},
+			{Key: "HARDCOVER_USERNAME", Label: "Hardcover username", Kind: "text", Help: "Only if you use Hardcover as the source."},
+			{Key: "HARDCOVER_TOKEN", Label: "Hardcover API token", Kind: "password", Secret: true},
+		},
+	},
+	{
+		Title: "Shelfarr — downloads", Desc: "Where the books you want are requested for download.",
+		Fields: []setField{
+			{Key: "SHELFARR_URL", Label: "Shelfarr URL", Kind: "text", Help: "e.g. http://192.168.1.10:5056"},
+			{Key: "SHELFARR_TOKEN", Label: "Shelfarr API token", Kind: "password", Secret: true, Help: "shf_… token with search:read, requests:read, requests:write."},
+			{Key: "SHELFARR_INSECURE", Label: "Allow plain HTTP on the LAN", Kind: "checkbox", OnValue: "true", OffValue: "false"},
+			{Key: "FORMAT", Label: "Default format", Kind: "select", Options: []string{"ebook", "audiobook"}},
+			{Key: "MAX_REQUESTS_PER_RUN", Label: "Max requests per run", Kind: "number"},
+			{Key: "SIMILARITY_THRESHOLD", Label: "Match similarity threshold", Kind: "number", Help: "0–1; higher = stricter title/author match."},
+			{Key: "FIRST_RUN", Label: "First-run mode", Kind: "select", Options: []string{"baseline", "backfill"},
+				Help: "baseline = mark existing books as seen; backfill = request them all."},
+			{Key: "LANG_INFERENCE", Label: "Infer language from the title", Kind: "checkbox", OnValue: "on", OffValue: "off",
+				Help: "A per-shelf language below overrides this."},
+		},
+	},
+	{
+		Title: "Calibre-Web (CWA)", Desc: "Cross-reference what you own and organize your Calibre library.",
+		Fields: []setField{
+			{Key: "CWA_ENABLED", Label: "Sync to Calibre-Web-Automated", Kind: "checkbox", OnValue: "true", OffValue: "false",
+				Help: "Topic shelves → tags, reading lists → shelves, read → read flag, plus rating + date."},
+			{Key: "CWA_URL", Label: "CWA URL", Kind: "text", Help: "e.g. http://192.168.1.10:8083"},
+			{Key: "CWA_USERNAME", Label: "CWA username", Kind: "text"},
+			{Key: "CWA_PASSWORD", Label: "CWA password", Kind: "password", Secret: true},
+			{Key: "CWA_DATE_COLUMN", Label: "Date-added custom column id", Kind: "text", Help: "Optional, e.g. 1 — pushes your Goodreads date added."},
+		},
+	},
+	{Title: "Schedule", Desc: "How often BookBridge syncs automatically."}, // rendered specially
+	{
+		Title: "Access & web UI", Desc: "Who can reach this interface, and on what port.",
+		Fields: []setField{
+			{Key: "AUTH_METHOD", Label: "Login method", Kind: "select", Options: []string{"forms", "none"}},
+			{Key: "AUTH_REQUIRED", Label: "When is login required", Kind: "select", Options: []string{"enabled", "local"},
+				Help: "local = no login on your LAN, login from outside; enabled = always."},
+			{Key: "GUI_PORT", Label: "Web UI port", Kind: "number", Help: "Changing it needs a container restart."},
+		},
+	},
+}
+
+// allSettingFields flattens every editable field (skipping the Schedule marker).
+func allSettingFields() []setField {
+	var out []setField
+	for _, s := range settingsSections {
+		out = append(out, s.Fields...)
+	}
+	return out
 }
 
 // scheduleOption is one entry in the visual schedule preset selector.
@@ -103,8 +147,9 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.st.SetSetting(ctx, "SCHEDULE", cronExpr)
-		for _, f := range settingFields {
-			if f.Kind == "checkbox" {
+		for _, f := range allSettingFields() {
+			switch f.Kind {
+			case "checkbox":
 				// An unchecked checkbox submits nothing; always write a canonical
 				// on/off value so a setting can actually be turned OFF.
 				if _, ok := r.PostForm[f.Key]; ok {
@@ -112,24 +157,16 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				} else {
 					s.st.SetSetting(ctx, f.Key, f.OffValue)
 				}
-				continue
-			}
-			if f.Kind == "select" {
+			case "select":
 				// A select always submits a deliberate value (incl. the empty
-				// "auto" choice), so write it verbatim — otherwise picking "auto"
-				// could never clear a previously-saved mode.
+				// "auto" choice), so write it verbatim.
 				if _, ok := r.PostForm[f.Key]; ok {
 					s.st.SetSetting(ctx, f.Key, r.PostFormValue(f.Key))
 				}
-				continue
-			}
-			if v := r.PostFormValue(f.Key); v != "" {
-				s.st.SetSetting(ctx, f.Key, v)
-			}
-		}
-		for _, f := range secretFields {
-			if v := r.PostFormValue(f.Key); v != "" { // only overwrite when provided
-				s.st.SetSetting(ctx, f.Key, v)
+			default: // text, number, password, textarea — secrets only save when non-blank
+				if v := r.PostFormValue(f.Key); v != "" {
+					s.st.SetSetting(ctx, f.Key, v)
+				}
 			}
 		}
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
@@ -152,16 +189,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// renderSettings renders the settings page with the given schedule view-model.
-// It is shared by the GET path and the POST error path (invalid schedule).
+// renderSettings renders the grouped settings page. Shared by the GET path and
+// the POST error path (invalid schedule).
 func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched scheduleVM) {
 	cfg := s.cfg()
-	type field struct {
-		Key, Label, Kind, Value string
-		Options                 []string
-		Checked                 bool
-	}
-	var fields []field
 	cur := map[string]string{
 		"SOURCE": cfg.Source, "GOODREADS_MODE": cfg.GoodreadsMode, "SHELFARR_URL": cfg.ShelfarrURL,
 		"GOODREADS_USER_ID": cfg.GoodreadsUserID, "HARDCOVER_USERNAME": cfg.HardcoverUsername,
@@ -172,24 +203,32 @@ func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, sched sc
 		"CWA_URL": cfg.CWAURL, "CWA_USERNAME": cfg.CWAUsername, "CWA_DATE_COLUMN": cfg.CWADateColumn,
 	}
 	checked := map[string]bool{
-		"LANG_INFERENCE": cfg.LangInference, "SHELFARR_INSECURE": cfg.ShelfarrInsecure,
-		"CWA_ENABLED": cfg.CWAEnabled,
+		"LANG_INFERENCE": cfg.LangInference, "SHELFARR_INSECURE": cfg.ShelfarrInsecure, "CWA_ENABLED": cfg.CWAEnabled,
 	}
-	for _, f := range settingFields {
-		fields = append(fields, field{
-			Key: f.Key, Label: f.Label, Kind: f.Kind, Value: cur[f.Key],
-			Options: f.Options, Checked: checked[f.Key],
-		})
+	type vmField struct {
+		Key, Label, Kind, Value, Help string
+		Options                       []string
+		Checked, Secret, Set          bool
 	}
-	type secret struct {
-		Key, Label string
-		Set        bool
+	type vmSection struct {
+		Title, Desc string
+		Fields      []vmField
 	}
-	var secrets []secret
-	for _, f := range secretFields {
-		secrets = append(secrets, secret{f.Key, f.Label, s.settingValue(f.Key) != ""})
+	var sections []vmSection
+	for _, sec := range settingsSections {
+		vs := vmSection{Title: sec.Title, Desc: sec.Desc}
+		for _, f := range sec.Fields {
+			vs.Fields = append(vs.Fields, vmField{
+				Key: f.Key, Label: f.Label, Kind: f.Kind, Help: f.Help, Options: f.Options,
+				Value: cur[f.Key], Checked: checked[f.Key], Secret: f.Secret,
+				Set: f.Secret && s.settingValue(f.Key) != "",
+			})
+		}
+		sections = append(sections, vs)
 	}
-	s.render(w, r, "settings", "Settings", map[string]any{"Fields": fields, "Secrets": secrets, "Schedule": sched})
+	s.render(w, r, "settings", "Settings", map[string]any{
+		"Sections": sections, "Schedule": sched, "Shelves": s.shelvesVM(r),
+	})
 }
 
 func (s *Server) localNoSession(r *http.Request) bool {

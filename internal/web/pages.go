@@ -214,28 +214,10 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/activity", http.StatusMovedPermanently)
 }
 
-func (s *Server) handleShelves(w http.ResponseWriter, r *http.Request) {
+// shelvesVM builds the shelf-management view-model embedded in the Settings page.
+func (s *Server) shelvesVM(r *http.Request) map[string]any {
 	ctx := context.Background()
 	cfg := s.cfg()
-	if r.Method == http.MethodPost {
-		if !s.localNoSession(r) && !s.requireCSRF(w, r) {
-			return
-		}
-		r.ParseForm()
-		// Save every shelf row carried in the form (the "shelves" hidden field
-		// lists the slugs) so all toggles persist in one click.
-		for _, sh := range strings.Split(r.PostFormValue("shelves"), ",") {
-			if sh == "" {
-				continue
-			}
-			enabled := r.PostFormValue("enabled_"+sh) != ""
-			s.st.SetShelfConfig(ctx, sh, enabled, r.PostFormValue("format_"+sh), r.PostFormValue("language_"+sh))
-		}
-		http.Redirect(w, r, "/shelves?saved=1", http.StatusSeeOther)
-		return
-	}
-	// Prefer discovered/configured shelves; fall back to the legacy SHELVES text
-	// so existing installs still see their shelves until they hit Refresh.
 	rows, _ := s.st.AllShelfConfigs(ctx)
 	if len(rows) == 0 {
 		for _, sh := range cfg.Shelves {
@@ -250,12 +232,34 @@ func (s *Server) handleShelves(w http.ResponseWriter, r *http.Request) {
 	if cfg.Source == "hardcover" {
 		sourceName = "Hardcover"
 	}
-	s.render(w, r, "shelves", "Shelves", map[string]any{
+	return map[string]any{
 		"Shelves": rows, "Slugs": strings.Join(slugs, ","),
 		"CanDiscover": s.discover != nil, "Source": sourceName,
 		"Refreshed": r.URL.Query().Get("refreshed"), "Saved": r.URL.Query().Get("saved") != "",
 		"Err": r.URL.Query().Get("err"),
-	})
+	}
+}
+
+// handleShelves saves the shelf toggles (POST). Shelf management now lives inside
+// the Settings page, so GET redirects there.
+func (s *Server) handleShelves(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/settings#shelves", http.StatusMovedPermanently)
+		return
+	}
+	if !s.localNoSession(r) && !s.requireCSRF(w, r) {
+		return
+	}
+	r.ParseForm()
+	for _, sh := range strings.Split(r.PostFormValue("shelves"), ",") {
+		if sh == "" {
+			continue
+		}
+		enabled := r.PostFormValue("enabled_"+sh) != ""
+		s.st.SetShelfConfig(ctx, sh, enabled, r.PostFormValue("format_"+sh), r.PostFormValue("language_"+sh))
+	}
+	http.Redirect(w, r, "/settings?saved=1#shelves", http.StatusSeeOther)
 }
 
 // handleShelvesRefresh asks the connected source to enumerate the user's shelves
@@ -263,23 +267,23 @@ func (s *Server) handleShelves(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleShelvesRefresh(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/shelves", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings#shelves", http.StatusSeeOther)
 		return
 	}
 	if !s.localNoSession(r) && !s.requireCSRF(w, r) {
 		return
 	}
 	if s.discover == nil {
-		http.Redirect(w, r, "/shelves?err="+url.QueryEscape("shelf discovery is not available"), http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err="+url.QueryEscape("shelf discovery is not available"), http.StatusSeeOther)
 		return
 	}
 	shelves, err := s.discover(ctx)
 	if err != nil {
-		http.Redirect(w, r, "/shelves?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	for _, sh := range shelves {
 		_ = s.st.UpsertDiscoveredShelf(ctx, sh.Slug, sh.Name, sh.Count)
 	}
-	http.Redirect(w, r, "/shelves?refreshed="+strconv.Itoa(len(shelves)), http.StatusSeeOther)
+	http.Redirect(w, r, "/settings?refreshed="+strconv.Itoa(len(shelves)), http.StatusSeeOther)
 }

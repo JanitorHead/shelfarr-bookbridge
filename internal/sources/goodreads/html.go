@@ -26,9 +26,11 @@ func coverSrc(img *goquery.Selection) string {
 	return ""
 }
 
-// grHTMLDateLayouts are the display formats Goodreads renders date columns in
-// (print view), distinct from the RFC-style dates in RSS (grDateLayouts).
-var grHTMLDateLayouts = []string{"Jan 02, 2006", "Jan 2006", "2006/01/02", "Jan 02 2006"}
+// grHTMLDateLayouts are the display formats Goodreads renders date columns in,
+// distinct from the RFC-style dates in RSS (grDateLayouts). date_read/started
+// use "Jan 02, 2006" (span.<field>_value); date_added's span[title] is the long
+// "January 02, 2006".
+var grHTMLDateLayouts = []string{"Jan 02, 2006", "January 02, 2006", "Jan 2006", "2006/01/02", "Jan 02 2006"}
 
 // grDate parses a Goodreads date cell, returning the zero time for blanks or
 // the "not set" placeholder. It tolerates the few formats Goodreads uses.
@@ -45,23 +47,44 @@ func grDate(s string) time.Time {
 	return time.Time{}
 }
 
-// dateCell reads a review/list date field's display value (Goodreads wraps the
-// shown date in span.date_<field>_value inside the cell, falling back to the
-// cell text).
+// dateCell reads a review/list date field. date_read/date_started put the shown
+// date in span.<field>_value (e.g. span.date_read_value → "Apr 11, 2017");
+// date_added is a span[title="January 02, 2006"] with the short date as text.
 func dateCell(row *goquery.Selection, field string) time.Time {
 	cell := row.Find("td.field." + field + " div.value")
-	if v := strings.TrimSpace(cell.Find("span.date_" + field + "_value").Text()); v != "" {
+	// .First(): a re-read book has several <span.date_read_value> — take the latest
+	// shown (Goodreads lists the most recent first).
+	if v := strings.TrimSpace(cell.Find("span." + field + "_value").First().Text()); v != "" {
 		return grDate(v)
 	}
-	return grDate(cell.Text())
+	if s := cell.Find("span[title]").First(); s.Length() > 0 {
+		if t := grDate(strings.TrimSpace(s.AttrOr("title", ""))); !t.IsZero() {
+			return t
+		}
+		if t := grDate(strings.TrimSpace(s.Text())); !t.IsZero() {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
-// htmlUserRating reads the user's rating (0–5) from a review/list row; Goodreads
-// renders it as filled-star spans (class "p10"). Best-effort: 0 when absent.
+// htmlUserRating reads the user's own rating (0–5). Current Goodreads renders it
+// as div.stars[data-rating]; older/static rows use filled "p10" star spans.
 func htmlUserRating(row *goquery.Selection) int {
+	if v, ok := row.Find("td.field.rating div.stars").Attr("data-rating"); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+			if n < 0 {
+				n = 0
+			}
+			if n > 5 {
+				n = 5
+			}
+			return n
+		}
+	}
 	n := row.Find("td.field.rating .p10").Length()
 	if n > 5 {
-		return 5
+		n = 5
 	}
 	return n
 }

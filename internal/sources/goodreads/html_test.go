@@ -8,9 +8,10 @@ const sampleHTML = `<html><head><title>Rafa's books</title></head><body>
  <td class="field title"><div class="value"><a href="/book/show/12345.El_Nombre_del_Viento" title="El Nombre del Viento">El Nombre del Viento</a></div></td>
  <td class="field author"><div class="value"><a href="/author/show/1.x">Rothfuss, Patrick</a></div></td>
  <td class="field isbn"><div class="value">8401352835</div></td>
- <td class="field date_started"><div class="value"><span class="date_date_started_value">Jan 05, 2024</span></div></td>
- <td class="field date_read"><div class="value"><span class="date_date_read_value">Feb 20, 2024</span></div></td>
- <td class="field date_added"><div class="value">Dec 01, 2023</div></td>
+ <td class="field rating"><div class="value"><div class="stars" data-rating="4"></div></div></td>
+ <td class="field date_started"><div class="value"><div class="editable_date"><span class="date_started_value">Jan 05, 2024</span></div></div></td>
+ <td class="field date_read"><div class="value"><div class="date_row"><span class="date_read_value">Feb 20, 2024</span><span class="date_read_value">Jan 01, 2020</span></div></div></td>
+ <td class="field date_added"><div class="value"><span title="December 01, 2023"> Dec 01, 2023 </span></div></td>
 </tr>
 <tr id="review_2">
  <td class="field title"><div class="value"><a href="/book/show/67890.The_Wise_Mans_Fear" title="The Wise Man's Fear">The Wise Man&#39;s Fear</a></div></td>
@@ -43,6 +44,9 @@ func TestParseHTMLList(t *testing.T) {
 	}
 	if books[0].Shelves[0] != "to-read" {
 		t.Fatalf("shelf not tagged: %v", books[0].Shelves)
+	}
+	if books[0].UserRating != 4 {
+		t.Fatalf("rating: got %d want 4 (from div.stars data-rating)", books[0].UserRating)
 	}
 	if got := books[0].StartedAt.Format("2006-01-02"); got != "2024-01-05" {
 		t.Fatalf("started_at: got %q", got)

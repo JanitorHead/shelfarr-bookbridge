@@ -12,7 +12,7 @@ import (
 func TestQueueListsBooks(t *testing.T) {
 	s := testServer(t)
 	s.st.Diff(reqCtx(), []sources.Book{{Source: "goodreads", ExternalID: "1", Title: "Dune", Author: "Frank Herbert"}})
-	req := httptest.NewRequest("GET", "/queue", nil)
+	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)

@@ -131,16 +131,54 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
 	mux.HandleFunc("/settings", s.guard(s.handleSettings))
+	mux.HandleFunc("/theme", s.handleTheme)
 	mux.HandleFunc("/actions/sync", s.guard(s.handleSync))
 	mux.HandleFunc("/actions/stop", s.guard(s.handleStop))
 	mux.HandleFunc("/actions/status", s.guard(s.handleStatus))
-	mux.HandleFunc("/queue", s.guard(s.handleQueue))
+	mux.HandleFunc("/activity", s.guard(s.handleActivity))
 	mux.HandleFunc("/review", s.guard(s.handleReview))
 	mux.HandleFunc("/shelves", s.guard(s.handleShelves))
 	mux.HandleFunc("/shelves/refresh", s.guard(s.handleShelvesRefresh))
 	mux.HandleFunc("/actions/refresh-ownership", s.guard(s.handleRefreshOwnership))
-	mux.HandleFunc("/", s.guard(s.handleDashboard))
+	// /queue is the old Library route — keep it as a redirect to the new home.
+	mux.HandleFunc("/queue", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/"+queryTail(r), http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/", s.guard(s.handleLibrary))
 	return securityHeaders(mux)
+}
+
+// queryTail returns "?<rawquery>" or "" so a redirect can preserve filters.
+func queryTail(r *http.Request) string {
+	if r.URL.RawQuery == "" {
+		return ""
+	}
+	return "?" + r.URL.RawQuery
+}
+
+// handleTheme records the light/dark/system theme preference in a cookie and
+// returns to the page the user came from. The attribute is rendered server-side
+// (see render) so there is no flash and no inline script — CSP-safe.
+func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
+	v := r.URL.Query().Get("v")
+	if v != "light" && v != "dark" {
+		v = "system"
+	}
+	http.SetCookie(w, &http.Cookie{Name: "bb_theme", Value: v, Path: "/", MaxAge: 31536000, SameSite: http.SameSiteLaxMode})
+	dest := r.Header.Get("Referer")
+	if dest == "" {
+		dest = "/"
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+// themePref reads the user's theme cookie (system|light|dark), defaulting to
+// "system" (which follows the OS via a CSS media query).
+func themePref(r *http.Request) string {
+	if c, err := r.Cookie("bb_theme"); err == nil && (c.Value == "light" || c.Value == "dark") {
+		return c.Value
+	}
+	return "system"
 }
 
 func securityHeaders(h http.Handler) http.Handler {
@@ -184,6 +222,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page, title stri
 	base := map[string]any{
 		"Title": title, "Authed": canUse, "HasSession": se != nil,
 		"Active": activePage(r.URL.Path), "CSRF": "", "Flash": "",
+		"Theme": themePref(r),
 	}
 	if se != nil {
 		base["CSRF"] = se.csrf

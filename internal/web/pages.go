@@ -38,9 +38,9 @@ func libHref(f store.LibraryFilter) string {
 		v.Set("q", f.Q)
 	}
 	if len(v) == 0 {
-		return "/queue"
+		return "/"
 	}
-	return "/queue?" + v.Encode()
+	return "/?" + v.Encode()
 }
 
 // withField clones a filter overriding exactly one field, for chip hrefs that
@@ -57,7 +57,7 @@ func withField(f store.LibraryFilter, field, val string) store.LibraryFilter {
 	return f
 }
 
-func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	f := store.LibraryFilter{
 		State:  r.URL.Query().Get("state"),
@@ -117,21 +117,21 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 // handleRefreshOwnership re-runs the CWA ownership cross-reference on demand.
 func (s *Server) handleRefreshOwnership(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/queue", http.StatusSeeOther)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	if !s.localNoSession(r) && !s.requireCSRF(w, r) {
 		return
 	}
 	if s.refreshOwn == nil {
-		http.Redirect(w, r, "/queue?err="+url.QueryEscape("CWA is not configured — set it in Settings"), http.StatusSeeOther)
+		http.Redirect(w, r, "/?err="+url.QueryEscape("CWA is not configured — set it in Settings"), http.StatusSeeOther)
 		return
 	}
 	if err := s.refreshOwn(context.Background()); err != nil {
-		http.Redirect(w, r, "/queue?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/queue?owned_refreshed=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/?owned_refreshed=1", http.StatusSeeOther)
 }
 
 func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {

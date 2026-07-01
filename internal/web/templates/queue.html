@@ -2,14 +2,14 @@
 {{if .OwnRefreshed}}<div class="banner banner-ok">Ownership refreshed against Calibre.</div>{{end}}
 {{if .Err}}<div class="banner banner-error">{{.Err}}</div>{{end}}
 {{if .CWAOn}}<form method="post" action="/actions/refresh-ownership" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn btn-secondary">Refresh ownership from Calibre</button></form>{{end}}
-<form method="get" action="/queue" class="toolbar">
+<form method="get" action="/" class="toolbar">
 {{if .State}}<input type="hidden" name="state" value="{{.State}}">{{end}}
 {{if .Status}}<input type="hidden" name="status" value="{{.Status}}">{{end}}
 {{if .Tag}}<input type="hidden" name="tag" value="{{.Tag}}">{{end}}
 {{if .Owned}}<input type="hidden" name="owned" value="{{.Owned}}">{{end}}
 <input type="search" name="q" value="{{.Q}}" placeholder="Search title or author…">
 <button class="btn">Search</button>
-{{if .State}}<a class="chip chip-on" href="/queue">pipeline: {{stateLabel .State}} ✕</a>{{end}}
+{{if .State}}<a class="chip chip-on" href="/">pipeline: {{stateLabel .State}} ✕</a>{{end}}
 </form>
 <div class="filters">
 <div class="filter-group"><span class="filter-lbl">Status</span><div class="chips">

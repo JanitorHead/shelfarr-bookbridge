@@ -36,15 +36,11 @@ func stateLabel(state string) string {
 // activePage maps a request path to the nav key used to highlight the current tab.
 func activePage(path string) string {
 	switch {
-	case path == "/":
-		return "dashboard"
-	case strings.HasPrefix(path, "/queue"):
-		return "queue"
-	case strings.HasPrefix(path, "/review"):
-		return "review"
-	case strings.HasPrefix(path, "/shelves"):
-		return "shelves"
-	case strings.HasPrefix(path, "/settings"):
+	case path == "/" || strings.HasPrefix(path, "/queue") || strings.HasPrefix(path, "/book"):
+		return "library"
+	case strings.HasPrefix(path, "/activity") || strings.HasPrefix(path, "/review"):
+		return "activity"
+	case strings.HasPrefix(path, "/shelves"), strings.HasPrefix(path, "/settings"):
 		return "settings"
 	default:
 		return ""

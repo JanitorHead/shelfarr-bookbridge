@@ -13,19 +13,19 @@ import (
 func TestDashboardShowsCounts(t *testing.T) {
 	s := testServer(t)
 	s.st.Diff(reqCtx(), []sources.Book{{Source: "goodreads", ExternalID: "1", Title: "A", Author: "X"}})
-	req := httptest.NewRequest("GET", "/", nil)
+	req := httptest.NewRequest("GET", "/activity", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
 	body := rec.Body.String()
-	if !strings.Contains(body, "Dashboard") || !strings.Contains(body, "catalog") {
+	if !strings.Contains(body, "Activity") || !strings.Contains(body, "catalog") {
 		t.Fatalf("dashboard missing counts: %s", body)
 	}
 }
 
 func TestDashboardShowsRunStatus(t *testing.T) {
 	s := testServer(t)
-	req := httptest.NewRequest("GET", "/", nil)
+	req := httptest.NewRequest("GET", "/activity", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 
 	rec := httptest.NewRecorder()

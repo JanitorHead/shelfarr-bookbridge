@@ -243,7 +243,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	counts, _ := s.st.StateCounts(ctx)
 	order := []string{"catalog", "new", "requesting", "requested", "searching", "downloading", "done", "not_found", "failed", "parked", "cancelled", "baseline", "ignored"}
@@ -270,7 +270,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	downloading, _ := s.st.ListBooks(ctx, "downloading", "", 8)
 	notFound, _ := s.st.ListBooks(ctx, "not_found", "", 8)
 	prog, _ := s.st.Progress(ctx)
-	s.render(w, r, "dashboard", "Dashboard", map[string]any{
+	s.render(w, r, "dashboard", "Activity", map[string]any{
 		"Cells": cells, "NeedsAuth": needsAuth, "Started": started, "Stopping": stopping,
 		"Running": running, "StartedAt": startedAt,
 		"Last": last, "HasLast": hasLast, "Recent": recent, "NextRun": next,

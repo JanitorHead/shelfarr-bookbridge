@@ -1,13 +1,16 @@
-{{define "base"}}<!doctype html><html lang="en"><head>
+{{define "base"}}<!doctype html><html lang="en" data-theme="{{.Theme}}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BookBridge — {{.Title}}</title><link rel="icon" type="image/svg+xml" href="/static/icon.svg"><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
 <body><header><a class="brand" href="/"><img src="/static/icon.svg" width="24" height="24" alt="">BookBridge</a>
 {{if .Authed}}<nav>
-<a href="/" {{if eq .Active "dashboard"}}class="active"{{end}}>Dashboard</a>
-<a href="/queue" {{if eq .Active "queue"}}class="active"{{end}}>Library</a>
-<a href="/review" {{if eq .Active "review"}}class="active"{{end}}>Review</a>
-<a href="/shelves" {{if eq .Active "shelves"}}class="active"{{end}}>Shelves</a>
+<a href="/" {{if eq .Active "library"}}class="active"{{end}}>Library</a>
+<a href="/activity" {{if eq .Active "activity"}}class="active"{{end}}>Activity</a>
 <a href="/settings" {{if eq .Active "settings"}}class="active"{{end}}>Settings</a>
+<span class="theme-switch" role="group" aria-label="Theme">
+<a href="/theme?v=system" class="{{if eq .Theme "system"}}on{{end}}" title="Follow system">◐</a>
+<a href="/theme?v=light" class="{{if eq .Theme "light"}}on{{end}}" title="Light">☀</a>
+<a href="/theme?v=dark" class="{{if eq .Theme "dark"}}on{{end}}" title="Dark">☾</a>
+</span>
 {{if .HasSession}}<form method="post" action="/logout" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn-secondary">Logout</button></form>{{end}}
 </nav>{{end}}
 </header><main>{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}{{template "content" .}}</main></body></html>{{end}}

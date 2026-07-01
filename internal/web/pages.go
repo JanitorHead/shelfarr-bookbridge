@@ -167,7 +167,11 @@ func (s *Server) handleBook(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("drawer") != "" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
-		_ = s.tmpl.ExecuteTemplate(w, "bookdetail", data)
+		// Execute a CLONE, never s.tmpl itself: executing the shared template makes
+		// it un-Clone-able, which would break every other page's render().
+		if t, err := s.tmpl.Clone(); err == nil {
+			_ = t.ExecuteTemplate(w, "bookdetail", data)
+		}
 		return
 	}
 	s.render(w, r, "detail", d.Title, data)

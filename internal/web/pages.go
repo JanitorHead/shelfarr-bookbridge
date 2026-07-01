@@ -160,9 +160,11 @@ func (s *Server) handleBook(w http.ResponseWriter, r *http.Request) {
 	if se := s.session(r); se != nil {
 		csrf = se.csrf
 	}
+	highlights, _ := s.st.HighlightsFor(context.Background(), source, id)
 	data := map[string]any{
 		"B": d, "Own": ownership(d.BookRow), "Topics": store.TopicTags(d.Shelves),
 		"GoodreadsURL": goodreadsURL, "CalibreURL": calibreURL, "CSRF": csrf,
+		"Highlights": highlights,
 	}
 	if r.URL.Query().Get("drawer") != "" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

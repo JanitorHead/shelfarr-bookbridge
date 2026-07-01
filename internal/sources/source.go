@@ -29,6 +29,13 @@ type Book struct {
 	Notes         string // the user's private notes
 }
 
+// Highlight is one Kindle highlight (and optional note) the user made in a book.
+type Highlight struct {
+	Location string // Kindle location or "%" position
+	Text     string // the highlighted passage
+	Note     string // the user's note on that highlight, if any
+}
+
 // Source fetches books from the enabled shelves.
 type Source interface {
 	Fetch(ctx context.Context, shelves []string) ([]Book, error)

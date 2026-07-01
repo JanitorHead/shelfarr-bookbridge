@@ -167,6 +167,11 @@ a.bcard:hover .bcard-title{color:var(--link)}
 .bd-block-h{font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:.3rem}
 .bd-usertext{font-size:.9rem;line-height:1.55;color:var(--text);white-space:pre-wrap;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem}
 .bd-desc{font-size:.9rem;line-height:1.55;color:var(--text-soft)}
+.bd-highlights{display:flex;flex-direction:column;gap:.5rem}
+.bd-hl{border-left:3px solid var(--warn);background:var(--panel2);border-radius:0 8px 8px 0;padding:.45rem .7rem}
+.bd-hl-loc{font-size:.68rem;color:var(--muted);font-weight:600}
+.bd-hl-text{font-size:.88rem;line-height:1.45;color:var(--text);margin-top:.1rem}
+.bd-hl-note{font-size:.82rem;color:var(--text-soft);margin-top:.35rem;font-style:italic}
 .bd-actions{display:flex;flex-wrap:wrap;gap:.55rem}
 
 /* book list */

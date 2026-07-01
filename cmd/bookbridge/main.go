@@ -169,6 +169,26 @@ func runOnce(st *store.Store, getenv func(string) string, dryRun bool) (engine.R
 		if n, _ := st.BackfillCovers(context.Background()); n > 0 {
 			fmt.Fprintf(os.Stdout, "[covers] filled %d cover(s) from Open Library\n", n)
 		}
+		// Kindle highlights: only the Goodreads cookie source implements this; it
+		// visits just the handful of annotated books, so it's cheap.
+		type highlightFetcher interface {
+			FetchHighlights(context.Context) (map[string][]sources.Highlight, error)
+		}
+		if hf, ok := sourceFor(cfg, getenv).(highlightFetcher); ok {
+			if hl, err := hf.FetchHighlights(context.Background()); err != nil {
+				fmt.Fprintln(os.Stdout, "[highlights]", err)
+			} else {
+				n := 0
+				for extID, hs := range hl {
+					if st.ReplaceHighlights(context.Background(), "goodreads", extID, hs) == nil {
+						n += len(hs)
+					}
+				}
+				if n > 0 {
+					fmt.Fprintf(os.Stdout, "[highlights] saved %d highlight(s) across %d book(s)\n", n, len(hl))
+				}
+			}
+		}
 	}
 	// Then push Goodreads shelves into CWA as tags and refresh which catalog
 	// books are owned in Calibre (for the Library badges).

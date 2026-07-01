@@ -8,7 +8,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 13
+const schemaVersion = 14
 
 type Store struct{ db *sql.DB }
 
@@ -122,6 +122,11 @@ ALTER TABLE books ADD COLUMN calibre_id INTEGER NOT NULL DEFAULT 0;`,
 		// v13: your own review text + private notes from Goodreads.
 		`ALTER TABLE books ADD COLUMN review TEXT NOT NULL DEFAULT '';
 ALTER TABLE books ADD COLUMN private_notes TEXT NOT NULL DEFAULT '';`,
+		// v14: your Kindle highlights (many per book), scraped from Goodreads.
+		`CREATE TABLE IF NOT EXISTS book_highlights (
+  source TEXT NOT NULL, external_id TEXT NOT NULL, position INTEGER NOT NULL,
+  location TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (source, external_id, position));`,
 	}
 	for i := ver; i < schemaVersion; i++ {
 		if _, err := s.db.Exec(migrations[i]); err != nil {
